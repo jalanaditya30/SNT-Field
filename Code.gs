@@ -69,32 +69,22 @@ function timeStr_(v) {
 }
 
 /* ============================================================
-   THE INDEX — why this stays fast forever
+   ONE ROW PER MR
 
-   The Log is append-only and chronological, so every row for a given
-   date sits in one unbroken block. We remember the row number where
-   each date's block starts. doGet then reads only that block instead
-   of the whole sheet. Day 1 and year 5 cost the same.
+   The Log holds a single row per MR ID — their current mark. Marking
+   again overwrites that same row (date, time, status, zone, town, note),
+   so the sheet never grows past your MR count. There is no history: the
+   board shows only rows whose Date is today. For a frozen daily record,
+   turn on snapshotDaily() (see the bottom of this file).
    ============================================================ */
-function startRowFor_(sh, date) {
-  var props = PropertiesService.getScriptProperties();
-  var key = 'start_' + date;
-  var cached = props.getProperty(key);
-  if (cached) return Number(cached);
-
-  // Not indexed (old rows, or index cleared) — scan the Date column once,
-  // bottom-up, then remember the answer so we never scan again.
+function findMrRow_(sh, mrId) {
   var last = sh.getLastRow();
   if (last < 2) return 0;
-  var dates = sh.getRange(2, 2, last - 1, 1).getValues();
-  var first = 0;
-  for (var i = dates.length - 1; i >= 0; i--) {
-    var d = dateStr_(dates[i][0]);
-    if (d === date) first = i + 2;      // +2: skip header, 1-indexed rows
-    else if (first) break;              // walked past the top of the block
+  var ids = sh.getRange(2, 4, last - 1, 1).getValues();   // MR ID column
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(mrId)) return i + 2;  // 1-indexed, skip header
   }
-  if (first) props.setProperty(key, String(first));
-  return first;
+  return 0;
 }
 
 /* ---------------- WRITE ---------------- */
@@ -114,26 +104,22 @@ function doPost(e) {
     var time = Utilities.formatDate(now, TZ, 'HH:mm');
     var sh   = getLog_();
 
-    var start = startRowFor_(sh, date);
-    var updated = false;
-    if (start) {
-      var last = sh.getLastRow();
-      var ids = sh.getRange(start, 4, last - start + 1, 1).getValues();  // MR ID column only
-      for (var i = 0; i < ids.length; i++) {
-        if (String(ids[i][0]) === String(d.mrId)) { updated = true; break; }
-      }
-    }
-
-    sh.appendRow([
+    var rowData = [
       now, date, time,
-      d.mrId, d.mrName || '', d.division || '',
+      String(d.mrId), d.mrName || '', d.division || '',
       d.status, d.zone || '', d.city || '',
       String(d.note || '').slice(0, 60)
-    ]);
+    ];
 
-    // First row of a new day? Record where the block starts.
-    if (!start) {
-      PropertiesService.getScriptProperties().setProperty('start_' + date, String(sh.getLastRow()));
+    // Find this MR's row and overwrite it; add one if they've never marked.
+    var row = findMrRow_(sh, d.mrId);
+    var updated = false;
+    if (row) {
+      var prevDate = dateStr_(sh.getRange(row, 2).getValue());
+      updated = (prevDate === date);     // already marked today → this is a change
+      sh.getRange(row, 1, 1, HEADERS.length).setValues([rowData]);
+    } else {
+      sh.appendRow(rowData);
     }
 
     // A new mark makes the cached board stale — clear today's cache so
@@ -171,14 +157,13 @@ function getMaster_() {
 
 function readRows_(want) {
   var sh = getLog_();
-  var start = startRowFor_(sh, want);
+  var last = sh.getLastRow();
   var rows = [];
-  if (start) {
-    var last = sh.getLastRow();
-    var vals = sh.getRange(start, 1, last - start + 1, HEADERS.length).getValues();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
     for (var i = 0; i < vals.length; i++) {
       var r = vals[i];
-      if (dateStr_(r[1]) !== want) continue;   // guard against a stale index
+      if (dateStr_(r[1]) !== want) continue;   // only rows marked for this date
       rows.push({
         date: dateStr_(r[1]), time: timeStr_(r[2]),
         mrId: String(r[3]), mrName: String(r[4]), division: String(r[5]),
@@ -269,11 +254,26 @@ function TEST_writeRow() {
   Logger.log('Sheet: "' + getSS_().getName() + '"  |  rows now: ' + getLog_().getLastRow());
 }
 
-/* Rebuild the date index from scratch. Run this ONLY if you have
-   sorted, deleted, or inserted rows in Log and the board looks wrong. */
-function FIX_rebuildIndex() {
-  PropertiesService.getScriptProperties().deleteAllProperties();
-  Logger.log('Index cleared. It rebuilds itself on the next read — nothing else to do.');
+/* Collapse an existing Log to one row per MR (keeping each MR's most
+   recent row). Run this ONCE after switching to the one-row-per-MR
+   backend to clear out the old append-only history. Safe to re-run. */
+function SETUP_collapseToOnePerMR() {
+  var sh = getLog_();
+  var last = sh.getLastRow();
+  if (last < 2) { Logger.log('Log is already empty — nothing to collapse.'); return; }
+  var vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
+  var byId = {}, order = [];
+  vals.forEach(function (r) {
+    var id = String(r[3]);
+    if (!id) return;
+    if (!(id in byId)) order.push(id);
+    byId[id] = r;                       // last row seen per MR wins
+  });
+  var out = order.map(function (id) { return byId[id]; });
+  sh.getRange(2, 1, last - 1, HEADERS.length).clearContent();
+  if (out.length) sh.getRange(2, 1, out.length, HEADERS.length).setValues(out);
+  PropertiesService.getScriptProperties().deleteAllProperties();  // drop any old date index
+  Logger.log('Collapsed ' + (last - 1) + ' rows to ' + out.length + ' (one per MR).');
 }
 
 /* ---------------- OPTIONAL: 11:05 snapshot ----------------

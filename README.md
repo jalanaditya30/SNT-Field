@@ -67,27 +67,24 @@ Towns change roughly never, so they stay in code. Edit `ZONES` in `data.js`, pus
 
 ## How the data sits
 
-`Log` is append-only — every submission is a row, forever. Nothing is overwritten, so you keep a full audit trail including corrections. The dashboard takes the **last row per MR for today**, so an MR who marks Mehsana at 9:00 and corrects to Visnagar at 14:00 shows as Visnagar while both rows survive.
+`Log` holds **one row per MR** — their current mark. Marking again overwrites that same row (date, time, status, zone, towns, note), so the sheet never grows past your MR count. An MR who marks Mehsana at 9:00 and corrects to Visnagar at 14:00 ends the day as one Visnagar row. Towns and zones are stored comma-joined in a single cell, since an MR can pick several of each in one entry.
 
-**Reads stay fast as the Log grows.** Because the Log is append-only and chronological, each date's rows sit in one unbroken block. The script records the row where each date starts and reads only that block — so a poll costs the same whether the Log holds 40 rows or 40,000.
+**The board shows today only.** Each row carries the date it was last marked. The dashboard reads every row and shows the ones dated today; an MR whose row still says yesterday counts as "not marked" until they mark again. The Log stays tiny — ~4 rows now, ~40 at full strength — so reads are fast with no index to maintain.
 
-The catch: **do not sort, filter, insert, or delete rows in `Log`.** That breaks the index. If you do it by accident, run `FIX_rebuildIndex()` and the board recovers. To slice the data, use a separate tab with a `QUERY()` formula pointed at `Log`.
+**Trade-off: no history.** Because rows are overwritten, there's no record of past days. If you later want a daily archive, turn on `snapshotDaily()` — add a time-driven trigger at 11:05 IST and it appends that morning's board to a separate `Snapshots` tab, one frozen record per day. That's the place for history; `Log` is only ever "right now".
 
-At 40 MRs you'll write roughly 1,300 rows a month — about 160k cells a year against Google's 10M cap. Storage is a non-issue for decades.
-
-`snapshotDaily()` is optional. Add a time-driven trigger at 11:05 IST if you want a frozen record of the board at call time rather than end-of-day.
+Sorting or reordering `Log` is now harmless — there's no index to break.
 
 ## Editor functions
 
 | Run this | When |
 |---|---|
 | `SETUP_createMasterTab()` | Once, at setup |
+| `SETUP_collapseToOnePerMR()` | Once, right after switching to this backend — collapses old append-only history to one row per MR |
 | `WHERE_IS_MY_DATA()` | "The sheet is empty" — prints the real URL, tabs, timezone |
-| `TEST_writeRow()` | Writes a dummy row and shows the actual error if it fails |
-| `FIX_rebuildIndex()` | Only if you disturbed rows in `Log` and the board looks wrong |
+| `TEST_writeRow()` | Writes/overwrites a dummy row and shows the actual error if it fails |
 
 ## Notes
 
 - **No login.** Anyone with the link can mark as anyone. This is deliberate — it's a coordination board, not attendance for payroll. If it gets abused, the fix is per-MR links (`?id=mr07`), not passwords.
-- **LATE tag** appears on anything marked at or after `CUTOFF_HOUR` (11:00). It's a visible tag, not a lock — people can still mark at 4 PM, and you can still see they did.
 - **The phone remembers the MR's name** after the first use, so day 2 onward is: open link → tap status → tap town → send.
