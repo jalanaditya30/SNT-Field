@@ -109,8 +109,7 @@
     b.textContent = "Loading…";
     try {
       await loadMaster();   // live MR list from the Master tab
-      const res = await fetch(API_URL + "?date=" + todayIST() + "&t=" + Date.now(), { redirect: "follow" });
-      const out = await res.json();
+      const out = await apiFetch(API_URL + "?date=" + todayIST() + "&t=" + Date.now());
       if (!out.ok) throw new Error(out.error || "load failed");
       render(out.rows || []);
       b.textContent = MRS_SOURCE === "sheet" ? "Refresh" : "Refresh · old list";

@@ -36,6 +36,15 @@ Editing `Code.gs` does nothing live until you go `Deploy ▸ Manage deployments 
 
 Editing `data.js` is instant — just push to GitHub (allow ~1 min for Pages, and tell people to pull down to refresh).
 
+## "Unexpected token '<' … is not valid JSON"
+
+The site asked the script for data and got a Google **web page** back instead — a sign-in page or "page not found". The code is fine; the deployment is the problem. Check, in order:
+
+1. `Deploy ▸ Manage deployments ▸ ✏️` — **Who has access** must be **Anyone**. "Anyone with a Google account" also breaks it, because the fetch carries no login.
+2. Same dialog — pick **Version: New version**, then **Deploy**. Saved code edits do nothing until this.
+3. If you ever made a **new deployment** (instead of editing the existing one), the URL changed — copy the current `/exec` URL into `API_URL` in `data.js` and push.
+4. If the editor shows an authorisation banner after a code change, run any function once and approve it, then redeploy.
+
 ## Adding, renaming, and removing MRs — no code
 
 The live MR list is the **`Master` tab** of the Sheet. Run `SETUP_createMasterTab()` once from the editor to create it.
