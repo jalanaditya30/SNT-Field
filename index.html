@@ -53,6 +53,15 @@
       <div class="statuses" id="statuses"></div>
     </div>
 
+    <div class="step" id="stepLeave" hidden>
+      <span class="eyebrow">Leave dates <span class="req">— mark the whole period once</span></span>
+      <div class="daterow">
+        <div><label class="eyebrow2" for="leaveFrom">From</label><input type="date" id="leaveFrom"></div>
+        <div><label class="eyebrow2" for="leaveTo">To</label><input type="date" id="leaveTo"></div>
+      </div>
+      <p class="hint" id="leaveHint">You'll show as “On leave” for every day in this range — no need to mark again.</p>
+    </div>
+
     <div class="step" id="stepWhere" hidden>
       <span class="eyebrow">Zones <span class="req">— pick one or more</span></span>
       <div class="chips" id="zoneChips"></div>
@@ -205,6 +214,45 @@
     refresh();
   }
 
+  /* ---- leave date range (calendar) ---- */
+  const lFrom = $("leaveFrom"), lTo = $("leaveTo"), lHint = $("leaveHint");
+  const isoToday = todayIST();
+  lFrom.min = isoToday; lFrom.value = isoToday;
+  lTo.min = isoToday; lTo.value = isoToday;
+
+  function fmtDay(ymd) {
+    const p = String(ymd).split("-").map(Number);
+    return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" })
+      .format(new Date(p[0], p[1] - 1, p[2]));
+  }
+  function daysInclusive(a, b) {
+    const x = a.split("-").map(Number), y = b.split("-").map(Number);
+    return Math.round((Date.UTC(y[0], y[1] - 1, y[2]) - Date.UTC(x[0], x[1] - 1, x[2])) / 864e5) + 1;
+  }
+  function formatRange(from, to) {
+    to = to || from;
+    return from === to ? fmtDay(from) : fmtDay(from) + " → " + fmtDay(to) + " (" + daysInclusive(from, to) + " days)";
+  }
+  function updateLeaveHint() {
+    const f = lFrom.value, t = lTo.value;
+    if (f && t && f <= t) {
+      const n = daysInclusive(f, t);
+      lHint.textContent = n === 1
+        ? "On leave " + fmtDay(f) + " — 1 day."
+        : "On leave " + formatRange(f, t) + ". Marked once for the whole period — no need to mark again.";
+    } else if (f && t && f > t) {
+      lHint.textContent = "The “To” date is before the “From” date.";
+    } else {
+      lHint.textContent = "Pick your leave dates.";
+    }
+  }
+  lFrom.addEventListener("change", () => {
+    if (lTo.value && lTo.value < lFrom.value) lTo.value = lFrom.value;
+    lTo.min = lFrom.value || isoToday;
+    updateLeaveHint(); refresh();
+  });
+  lTo.addEventListener("change", () => { updateLeaveHint(); refresh(); });
+
   mrSel.addEventListener("change", () => {
     state.mrId = mrSel.value;
     if (state.mrId) localStorage.setItem(KEY_ME, state.mrId);
@@ -218,7 +266,9 @@
       b.setAttribute("aria-pressed", String(b.dataset.code === code))
     );
     const needsPlace = STATUSES.find((s) => s.code === code).field;
+    const isLeave = code === "LEAVE";
     $("stepWhere").hidden = !needsPlace;
+    $("stepLeave").hidden = !isLeave;
     if (needsPlace) {
       if (!$("townWrap").children.length) renderTowns();
     } else {
@@ -226,13 +276,16 @@
       [...zBox.children].forEach((b) => b.setAttribute("aria-pressed", "false"));
       renderTowns();
     }
+    if (isLeave) updateLeaveHint();
     refresh();
   }
 
   function valid() {
     if (!state.mrId || !state.status) return false;
     const needsPlace = STATUSES.find((s) => s.code === state.status).field;
-    return needsPlace ? state.picks.length > 0 : true;
+    if (needsPlace) return state.picks.length > 0;
+    if (state.status === "LEAVE") return !!(lFrom.value && lTo.value && lFrom.value <= lTo.value);
+    return true;
   }
   function refresh() {
     $("stepSubmit").hidden = !state.status;
@@ -264,8 +317,9 @@
       status: state.status,
       zone: ordered.map((p) => p.zone).join(", "),
       city: ordered.map((p) => p.city).join(", "),
-      note: $("note").value.trim(),
+      note: state.status === "WORKING" ? $("note").value.trim() : "",
     };
+    if (state.status === "LEAVE") { payload.leaveFrom = lFrom.value; payload.leaveTo = lTo.value; }
 
     try {
       // text/plain keeps this a "simple request" — no CORS preflight,
@@ -292,11 +346,17 @@
   /* ---- receipt ---- */
   function showReceipt(d, updated) {
     const st = STATUSES.find((s) => s.code === d.status);
-    $("receiptTitle").textContent = updated ? "Entry updated" : "Marked for today";
+    const isLeave = d.status === "LEAVE" && d.leaveFrom;
+    $("receiptTitle").textContent = isLeave ? "Leave marked" : (updated ? "Entry updated" : "Marked for today");
     $("rName").textContent = d.mrName + " · " + d.division;
     $("rStatus").textContent = st ? st.label : d.status;
-    if (d.city) {
+    if (isLeave) {
       $("rLocLabel").hidden = false; $("rLoc").hidden = false;
+      $("rLocLabel").textContent = "Dates";
+      $("rLoc").textContent = formatRange(d.leaveFrom, d.leaveTo);
+    } else if (d.city) {
+      $("rLocLabel").hidden = false; $("rLoc").hidden = false;
+      $("rLocLabel").textContent = "Where";
       $("rLoc").textContent = formatWhere(d.zone, d.city);
     } else {
       $("rLocLabel").hidden = true; $("rLoc").hidden = true;

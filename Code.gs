@@ -111,6 +111,32 @@ function findMrRow_(sh, mrId, date) {
   return 0;
 }
 
+/* Overwrite this MR's row for a date, or append one if absent. */
+function upsertRow_(sh, mrId, date, rowData) {
+  var row = findMrRow_(sh, mrId, date);
+  if (row) sh.getRange(row, 1, 1, HEADERS.length).setValues([rowData]);
+  else sh.appendRow(rowData);
+}
+
+/* Parse 'yyyy-MM-dd' to a Date fixed at ~noon IST (stable across the day). */
+function parseYMD_(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '').trim());
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 6, 30, 0)) : null;
+}
+
+/* Inclusive list of 'yyyy-MM-dd' from `from` to `to`, ordered, capped at
+   92 days so a bad range can't flood the sheet. */
+function datesBetween_(from, to) {
+  var a = parseYMD_(from), b = parseYMD_(to);
+  if (!a || !b) return [];
+  if (b.getTime() < a.getTime()) { var t = a; a = b; b = t; }
+  var out = [], DAY = 24 * 3600 * 1000;
+  for (var ms = a.getTime(); ms <= b.getTime() && out.length < 92; ms += DAY) {
+    out.push(Utilities.formatDate(new Date(ms), TZ, 'yyyy-MM-dd'));
+  }
+  return out;
+}
+
 /* ---------------- WRITE ---------------- */
 function doPost(e) {
   var lock = LockService.getScriptLock();
@@ -124,26 +150,35 @@ function doPost(e) {
     }
 
     var now  = new Date();
-    var date = today_();                 // server decides the date, never the phone
     var time = Utilities.formatDate(now, TZ, 'HH:mm');
     var sh   = getLog_();
+    var note = String(d.note || '').slice(0, 60);
 
+    // Leave over a date range: write one LEAVE row per day, so the board
+    // shows the MR on leave every day in the range without re-marking.
+    if (d.status === 'LEAVE' && d.leaveFrom) {
+      var days = datesBetween_(d.leaveFrom, d.leaveTo || d.leaveFrom);
+      if (!days.length) return json_({ ok: false, error: 'Pick valid leave dates' });
+      for (var k = 0; k < days.length; k++) {
+        upsertRow_(sh, d.mrId, days[k],
+          [now, days[k], time, String(d.mrId), d.mrName || '', d.division || '', 'LEAVE', '', '', note]);
+        cacheDel_('c_full_' + days[k]);
+        cacheDel_('c_rows_' + days[k]);
+      }
+      return json_({ ok: true, time: time, leaveDays: days.length, from: days[0], to: days[days.length - 1] });
+    }
+
+    var date = today_();                 // server decides the date, never the phone
     var rowData = [
       now, date, time,
       String(d.mrId), d.mrName || '', d.division || '',
-      d.status, d.zone || '', d.city || '',
-      String(d.note || '').slice(0, 60)
+      d.status, d.zone || '', d.city || '', note
     ];
 
     // Overwrite this MR's row for today, or add one if they haven't
     // marked today yet (a new day always starts a fresh row).
-    var row = findMrRow_(sh, d.mrId, date);
-    var updated = !!row;                  // already marked today → this is a change
-    if (row) {
-      sh.getRange(row, 1, 1, HEADERS.length).setValues([rowData]);
-    } else {
-      sh.appendRow(rowData);
-    }
+    var updated = !!findMrRow_(sh, d.mrId, date);
+    upsertRow_(sh, d.mrId, date, rowData);
 
     // A new mark makes the cached board stale — clear today's cache so
     // the next read rebuilds and everyone sees it within one poll.
