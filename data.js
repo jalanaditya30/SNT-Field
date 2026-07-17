@@ -3,7 +3,7 @@
    ============================================================ */
 
 /* 1. Your Apps Script Web App URL (ends with /exec) */
-const API_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE";
+const API_URL = "https://script.google.com/macros/s/AKfycbwCM-2r1-WTmYQCjhkXZFZk9DB9xZv-s7pnXaqB1no31TQVlwkYv9lgSQ2dl6dbCGvs/exec";
 
 /* 2. Cutoff hour (24h, IST). Entries at/after this are tagged LATE. */
 const CUTOFF_HOUR = 11;
@@ -13,9 +13,9 @@ const CUTOFF_HOUR = 11;
       This copy is used only if the sheet cannot be reached, so the form
       still works on a bad connection. Refresh it now and then. */
 let MRS = [
-  { id: "mr01", name: "Rohit",    division: "LCM" },
-  { id: "mr02", name: "Sukla ji", division: "LCM" },
-  { id: "mr03", name: "MR Three", division: "Novocamp" },
+  { id: "mr01", name: "Rohit",    division: "Alkem" },
+  { id: "mr02", name: "Sukla ji", division: "Alkem" },
+  { id: "mr03", name: "Vinayak", division: "Lupin" },
   { id: "mr04", name: "MR Four",  division: "Novocamp" },
 ];
 let MRS_SOURCE = "fallback";
