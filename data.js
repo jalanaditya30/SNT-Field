@@ -21,10 +21,14 @@ let MRS = [
 let MRS_SOURCE = "fallback";
 
 /* 4. Zones and towns — from Gujarat_MR_Zones.xlsx.
-      Add a town here, then push to GitHub. */
+      Add a town here, then push to GitHub. An MR can pick several towns
+      across several zones in one day (multi-select on the form). */
 const ZONES = {
+  "Ahmedabad": [
+    "Sabarmati", "Bopal",
+  ],
   "North Gujarat": [
-    "Ahmedabad", "Gandhinagar", "Mehsana", "Patan", "Palanpur",
+    "Gandhinagar", "Mehsana", "Patan", "Palanpur",
     "Himmatnagar", "Modasa", "Unjha", "Visnagar", "Kadi",
   ],
   "Central Gujarat": [
@@ -41,25 +45,39 @@ const ZONES = {
   ],
 };
 
-/* Order in the MR's zone dropdown */
-const ZONE_ORDER = ["North Gujarat", "Central Gujarat", "South Gujarat", "Saurashtra & Kutch"];
+/* Order the zones appear on the form */
+const ZONE_ORDER = ["Ahmedabad", "North Gujarat", "Central Gujarat", "South Gujarat", "Saurashtra & Kutch"];
 
-/* Order on the dashboard — laid out 2x2 to echo the Gujarat map:
-     North      | Central
-     Saurashtra | South                                          */
-const BOARD_ORDER = ["North Gujarat", "Central Gujarat", "Saurashtra & Kutch", "South Gujarat"];
+/* Order the zones appear on the dashboard */
+const BOARD_ORDER = ["Ahmedabad", "North Gujarat", "Central Gujarat", "Saurashtra & Kutch", "South Gujarat"];
 
 const ZONE_KEY = {
+  "Ahmedabad":          { var: "--z-ahmedabad" },
   "North Gujarat":      { var: "--z-north" },
   "Central Gujarat":    { var: "--z-central" },
   "South Gujarat":      { var: "--z-south" },
   "Saurashtra & Kutch": { var: "--z-west" },
 };
 
+/* Which zone each town belongs to — built once from ZONES so the
+   dashboard can place an MR under the right zone even when they logged
+   towns across several zones in one entry. */
+const CITY_TO_ZONE = {};
+Object.keys(ZONES).forEach(function (z) {
+  ZONES[z].forEach(function (c) { CITY_TO_ZONE[c] = z; });
+});
+
+/* Split a stored comma-joined field ("Sabarmati, Bopal") into a clean list. */
+function splitList(s) {
+  return String(s == null ? "" : s)
+    .split(",")
+    .map(function (x) { return x.trim(); })
+    .filter(Boolean);
+}
+
 /* 5. Non-field statuses. WORKING is handled separately. */
 const STATUSES = [
   { code: "WORKING", label: "Working in field", field: true },
-  { code: "HQ",      label: "Travelling to HQ", field: false },
   { code: "OFFICE",  label: "SNT Office",       field: false },
   { code: "LEAVE",   label: "On leave",         field: false },
 ];
