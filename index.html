@@ -66,7 +66,7 @@
 
 <script src="data.js"></script>
 <script>
-(function () {
+(async function () {
   const $ = (id) => document.getElementById(id);
   const state = { mrId: "", status: "", zone: "", city: "" };
   const KEY_ME = "snt_fb_me";
@@ -74,8 +74,13 @@
 
   $("mastDate").textContent = prettyDateIST();
 
-  /* ---- populate name dropdown ---- */
+  /* ---- live MR list from the Master tab; built-in list if offline ---- */
   const mrSel = $("mr");
+  mrSel.innerHTML = '<option value="">Loading names…</option>';
+  mrSel.disabled = true;
+  await loadMaster();
+  mrSel.disabled = false;
+  mrSel.innerHTML = '<option value="">Select your name…</option>';
   MRS.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((m) => {
     const o = document.createElement("option");
     o.value = m.id;
