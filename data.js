@@ -13,10 +13,25 @@ const CUTOFF_HOUR = 11;
       This copy is used only if the sheet cannot be reached, so the form
       still works on a bad connection. Refresh it now and then. */
 let MRS = [
-  { id: "mr01", name: "Rohit",    division: "Alkem" },
-  { id: "mr02", name: "Sukla ji", division: "Alkem" },
-  { id: "mr03", name: "Vinayak", division: "Lupin" },
-  { id: "mr04", name: "MR Four",  division: "Novocamp" },
+  { id: "mr01", name: "Rohit",       division: "Alkem - Novokem" },
+  { id: "mr02", name: "Hiten",       division: "Alkem - Novokem" },
+  { id: "mr03", name: "Jayesh",      division: "Alkem - Novokem" },
+  { id: "mr04", name: "Krishna",     division: "Alkem - Novokem" },
+  { id: "mr05", name: "Pawan",       division: "Alkem - Novokem" },
+  { id: "mr06", name: "Siddharth",   division: "Alkem - Novokem" },
+  { id: "mr07", name: "Prashant",    division: "Alkem - Novokem" },
+  { id: "mr08", name: "Bhavik",      division: "Alkem - Novokem" },
+  { id: "mr09", name: "Shukla",      division: "Alkem - Maxxio" },
+  { id: "mr10", name: "Mandip",      division: "Alkem - Maxxio" },
+  { id: "mr11", name: "Shiv Tiwari", division: "Alkem - Healthcare" },
+  { id: "mr12", name: "Arun Dubey",  division: "Alkem - Healthcare" },
+  { id: "mr13", name: "Siddharth",   division: "Ranbaxy" },
+  { id: "mr14", name: "Rahul",       division: "Ranbaxy" },
+  { id: "mr15", name: "Vishal",      division: "Ranbaxy" },
+  { id: "mr16", name: "Nilesh",      division: "Ranbaxy" },
+  { id: "mr17", name: "Vinayak",     division: "Lupin" },
+  { id: "mr18", name: "Haresh",      division: "Lupin" },
+  { id: "mr19", name: "Sanjay",      division: "Torque" },
 ];
 let MRS_SOURCE = "fallback";
 

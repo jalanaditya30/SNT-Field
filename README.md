@@ -51,7 +51,7 @@ The live MR list is the **`Master` tab** of the Sheet. Run `SETUP_createMasterTa
 
 | MR ID | MR Name | Division | Active |
 |-------|---------|----------|--------|
-| mr01  | Rohit   | LCM      | Y      |
+| mr01  | Rohit   | Alkem - Novokem | Y  |
 
 - **Add** → new row. Live within 60 seconds. Nothing to deploy, nothing to push.
 - **Rename** → edit the Name cell. Keep the ID.
@@ -67,20 +67,20 @@ Towns change roughly never, so they stay in code. Edit `ZONES` in `data.js`, pus
 
 ## How the data sits
 
-`Log` holds **one row per MR** — their current mark. Marking again overwrites that same row (date, time, status, zone, towns, note), so the sheet never grows past your MR count. An MR who marks Mehsana at 9:00 and corrects to Visnagar at 14:00 ends the day as one Visnagar row. Towns and zones are stored comma-joined in a single cell, since an MR can pick several of each in one entry.
+`Log` holds **one row per MR per day** — their mark for that date. Marking again the same day overwrites that row (time, status, zone, towns, note); a new day starts a new row. So an MR who marks Mehsana at 9:00 and corrects to Visnagar at 14:00 ends the day as one Visnagar row, and each past day stays on the sheet as history. Towns and zones are stored comma-joined in a single cell, since an MR can pick several of each in one entry.
 
-**The board shows today only.** Each row carries the date it was last marked. The dashboard reads every row and shows the ones dated today; an MR whose row still says yesterday counts as "not marked" until they mark again. The Log stays tiny — ~4 rows now, ~40 at full strength — so reads are fast with no index to maintain.
+**The board shows today only.** Each row carries its date; the dashboard shows the rows dated today, and an MR who hasn't marked today counts as "not marked" until they do. At ~19 MRs the Log grows by ~19 rows a day — a few thousand a year, which stays fast to read.
 
-**Trade-off: no history.** Because rows are overwritten, there's no record of past days. If you later want a daily archive, turn on `snapshotDaily()` — add a time-driven trigger at 11:05 IST and it appends that morning's board to a separate `Snapshots` tab, one frozen record per day. That's the place for history; `Log` is only ever "right now".
-
-Sorting or reordering `Log` is now harmless — there's no index to break.
+**History lives in `Log` itself** — one row per MR per day, so you can look back date by date. `snapshotDaily()` is still available if you also want a frozen 11:05 snapshot on a separate `Snapshots` tab.
 
 ## Editor functions
 
 | Run this | When |
 |---|---|
-| `SETUP_createMasterTab()` | Once, at setup |
-| `SETUP_collapseToOnePerMR()` | Once, right after switching to this backend — collapses old append-only history to one row per MR |
+| `SETUP_createMasterTab()` | Once, at setup (seeds the roster from `MR_SEED` in Code.gs) |
+| `SETUP_resetMasterTab()` | After editing the roster — replaces the Master tab with the current `MR_SEED` |
+| `SETUP_clearLog()` | Starting fresh (e.g. after swapping the roster) — wipes all mark rows |
+| `SETUP_collapseToOnePerMrPerDay()` | Once, if migrating an old append-only Log |
 | `WHERE_IS_MY_DATA()` | "The sheet is empty" — prints the real URL, tabs, timezone |
 | `TEST_writeRow()` | Writes/overwrites a dummy row and shows the actual error if it fails |
 
