@@ -46,10 +46,18 @@ function getLog_() {
   return sh;
 }
 
-function json_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+function textJson_(str) {
+  return ContentService.createTextOutput(str).setMimeType(ContentService.MimeType.JSON);
 }
+function json_(obj) { return textJson_(JSON.stringify(obj)); }
+
+/* Short-lived server cache. A read costs a full sheet round-trip; caching
+   the built response for a few seconds makes repeat polls and extra
+   viewers nearly free. Writes clear the day's cache so a new mark shows
+   up right away. */
+function cacheGet_(k) { try { return CacheService.getScriptCache().get(k); } catch (e) { return null; } }
+function cachePut_(k, v, ttl) { try { CacheService.getScriptCache().put(k, v, ttl || 25); } catch (e) {} }
+function cacheDel_(k) { try { CacheService.getScriptCache().remove(k); } catch (e) {} }
 
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
 
@@ -128,6 +136,11 @@ function doPost(e) {
       PropertiesService.getScriptProperties().setProperty('start_' + date, String(sh.getLastRow()));
     }
 
+    // A new mark makes the cached board stale — clear today's cache so
+    // the next read rebuilds and everyone sees it within one poll.
+    cacheDel_('c_full_' + date);
+    cacheDel_('c_rows_' + date);
+
     return json_({ ok: true, time: time, updated: updated });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
@@ -156,34 +169,61 @@ function getMaster_() {
   return out;
 }
 
-/* ---------------- READ ---------------- */
+function readRows_(want) {
+  var sh = getLog_();
+  var start = startRowFor_(sh, want);
+  var rows = [];
+  if (start) {
+    var last = sh.getLastRow();
+    var vals = sh.getRange(start, 1, last - start + 1, HEADERS.length).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var r = vals[i];
+      if (dateStr_(r[1]) !== want) continue;   // guard against a stale index
+      rows.push({
+        date: dateStr_(r[1]), time: timeStr_(r[2]),
+        mrId: String(r[3]), mrName: String(r[4]), division: String(r[5]),
+        status: String(r[6]), zone: String(r[7]), city: String(r[8]), note: String(r[9])
+      });
+    }
+  }
+  return rows;
+}
+
+/* ---------------- READ ----------------
+   ?board=1  -> one call returns the MR list AND today's rows, so the
+                dashboard needs a single round-trip instead of two.
+   ?config=1 -> just the MR list (used by the form).
+   otherwise -> today's (or ?date=) rows.                              */
 function doGet(e) {
   try {
     var p = (e && e.parameter) ? e.parameter : {};
 
     if (p.config === '1') {
-      return json_({ ok: true, mrs: getMaster_() });
+      var cc = cacheGet_('c_config');
+      if (cc) return textJson_(cc);
+      var cs = JSON.stringify({ ok: true, mrs: getMaster_() });
+      cachePut_('c_config', cs, 60);
+      return textJson_(cs);
     }
 
     var want = p.date || today_();
-    var sh = getLog_();
-    var start = startRowFor_(sh, want);
-    var rows = [];
 
-    if (start) {
-      var last = sh.getLastRow();
-      var vals = sh.getRange(start, 1, last - start + 1, HEADERS.length).getValues();
-      for (var i = 0; i < vals.length; i++) {
-        var r = vals[i];
-        if (dateStr_(r[1]) !== want) continue;   // guard against a stale index
-        rows.push({
-          date: dateStr_(r[1]), time: timeStr_(r[2]),
-          mrId: String(r[3]), mrName: String(r[4]), division: String(r[5]),
-          status: String(r[6]), zone: String(r[7]), city: String(r[8]), note: String(r[9])
-        });
-      }
+    if (p.board === '1') {
+      var bk = 'c_full_' + want;
+      var bc = cacheGet_(bk);
+      if (bc) return textJson_(bc);
+      var bs = JSON.stringify({ ok: true, date: want, mrs: getMaster_(), rows: readRows_(want) });
+      cachePut_(bk, bs, 25);
+      return textJson_(bs);
     }
-    return json_({ ok: true, date: want, rows: rows, scanned: rows.length });
+
+    var rk = 'c_rows_' + want;
+    var rc = cacheGet_(rk);
+    if (rc) return textJson_(rc);
+    var rows = readRows_(want);
+    var rs = JSON.stringify({ ok: true, date: want, rows: rows, scanned: rows.length });
+    cachePut_(rk, rs, 25);
+    return textJson_(rs);
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }

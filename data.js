@@ -116,6 +116,16 @@ async function apiFetch(url, options) {
   }
 }
 
+/* Seed MRS from the last list we saw, so names appear instantly on a
+   return visit instead of waiting for the network. */
+function primeMastersFromCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem("snt_mrs") || "null");
+    if (Array.isArray(c) && c.length) { MRS = c; return true; }
+  } catch (e) {}
+  return false;
+}
+
 /* Pull the live MR list from the Master tab. Falls back silently. */
 async function loadMaster() {
   try {
@@ -123,6 +133,7 @@ async function loadMaster() {
     if (out && out.ok && Array.isArray(out.mrs) && out.mrs.length) {
       MRS = out.mrs;
       MRS_SOURCE = "sheet";
+      try { localStorage.setItem("snt_mrs", JSON.stringify(out.mrs)); } catch (e) {}
       return true;
     }
   } catch (e) { /* keep fallback */ }
