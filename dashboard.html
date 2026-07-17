@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 AM Board — SNT Field Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="mast">
+  <h1>SNT <span>/ 11 AM Board</span></h1>
+  <div class="date" id="mastDate"></div>
+</div>
+
+<div class="tally">
+  <strong class="big" id="cnt">–</strong>
+  <span class="of" id="of">of – marked</span>
+  <span class="bar"><i id="bar" style="width:0%"></i></span>
+  <button class="refresh" id="refreshBtn">Refresh</button>
+</div>
+
+<main class="board" id="board"></main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  $("mastDate").textContent = prettyDateIST();
+
+  const byId = Object.fromEntries(MRS.map((m) => [m.id, m]));
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
+    );
+  }
+  function isLate(t) {
+    if (!t) return false;
+    const h = parseInt(String(t).split(":")[0], 10);
+    return Number.isFinite(h) && h >= CUTOFF_HOUR;
+  }
+
+  function render(rows) {
+    // last entry per MR wins
+    const marked = {};
+    rows.forEach((r) => { marked[r.mrId] = r; });
+
+    const buckets = {};
+    ZONE_ORDER.forEach((z) => (buckets[z] = []));
+    const offField = [], unmarked = [];
+
+    MRS.forEach((m) => {
+      const r = marked[m.id];
+      if (!r) { unmarked.push(m); return; }
+      if (r.status === "WORKING" && buckets[r.zone]) buckets[r.zone].push(r);
+      else offField.push(r);
+    });
+
+    const total = MRS.length;
+    const done = total - unmarked.length;
+    $("cnt").textContent = done;
+    $("of").textContent = "of " + total + " marked";
+    $("bar").style.width = (total ? (done / total) * 100 : 0) + "%";
+
+    let html = "";
+
+    ZONE_ORDER.forEach((z) => {
+      const list = buckets[z];
+      html += `<section class="box" style="--zc:var(${ZONE_KEY[z].var})">
+        <header><h2>${esc(z)}</h2><span class="n">${list.length}</span></header>`;
+      html += list.length
+        ? "<ul>" + list.map((r) => `<li>
+              <span class="nm">${esc(r.mrName)}<span class="dv">${esc(r.division)}</span></span>
+              <span class="loc">${esc(r.city)}${isLate(r.time) ? '<span class="tag-late">LATE</span>' : ""}</span>
+            </li>`).join("") + "</ul>"
+        : '<p class="empty">Nobody in this zone today.</p>';
+      html += "</section>";
+    });
+
+    const LBL = { HQ: "Travelling to HQ", OFFICE: "SNT Office", LEAVE: "On leave" };
+    html += `<section class="box offfield">
+      <header><h2>Not in field — declared</h2><span class="n">${offField.length}</span></header>`;
+    html += offField.length
+      ? "<ul>" + offField.map((r) => `<li>
+            <span class="nm">${esc(r.mrName)}<span class="dv">${esc(r.division)}</span></span>
+            <span class="loc">${esc(LBL[r.status] || r.status)}${isLate(r.time) ? '<span class="tag-late">LATE</span>' : ""}</span>
+          </li>`).join("") + "</ul>"
+      : '<p class="empty">Everyone is in the field.</p>';
+    html += "</section>";
+
+    html += `<section class="box unmarked${unmarked.length ? "" : " clear"}">
+      <header><h2>Not marked — call these</h2><span class="n">${unmarked.length}</span></header>`;
+    html += unmarked.length
+      ? "<ul>" + unmarked.map((m) => `<li>
+            <span class="nm">${esc(m.name)}<span class="dv">${esc(m.division)}</span></span>
+          </li>`).join("") + "</ul>"
+      : '<p class="empty">All ' + MRS.length + ' marked. Nothing to chase.</p>';
+    html += "</section>";
+
+    $("board").innerHTML = html;
+  }
+
+  async function load() {
+    const b = $("refreshBtn");
+    b.textContent = "Loading…";
+    try {
+      const res = await fetch(API_URL + "?date=" + todayIST() + "&t=" + Date.now(), { redirect: "follow" });
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "load failed");
+      render(out.rows || []);
+      b.textContent = "Refresh";
+    } catch (e) {
+      b.textContent = "Retry";
+      $("board").innerHTML =
+        '<section class="box unmarked"><header><h2>Board did not load</h2></header>' +
+        '<p class="empty">' + esc(e.message) + ' — press Retry.</p></section>';
+    }
+  }
+
+  $("refreshBtn").addEventListener("click", load);
+  load();
+  setInterval(load, 60000);
+})();
+</script>
+</body>
+</html>

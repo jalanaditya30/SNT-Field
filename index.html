@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ECEEEA">
+<title>Mark your day — SNT Field Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="mast">
+  <h1>SNT <span>/ Field Board</span></h1>
+  <div class="date" id="mastDate"></div>
+</div>
+
+<main class="wrap">
+
+  <!-- receipt shown after a successful mark -->
+  <section class="receipt" id="receipt" hidden>
+    <h2 id="receiptTitle">Marked for today</h2>
+    <dl>
+      <dt>Name</dt><dd id="rName"></dd>
+      <dt>Status</dt><dd id="rStatus"></dd>
+      <dt id="rLocLabel">Location</dt><dd id="rLoc"></dd>
+      <dt>Time</dt><dd id="rTime"></dd>
+    </dl>
+    <button class="linkbtn" id="editBtn">Change today's entry</button>
+  </section>
+
+  <form id="form">
+    <div class="step">
+      <label class="eyebrow" for="mr">Who is marking</label>
+      <select id="mr" required>
+        <option value="">Select your name…</option>
+      </select>
+    </div>
+
+    <div class="step" id="stepStatus" hidden>
+      <span class="eyebrow">Today I am</span>
+      <div class="statuses" id="statuses"></div>
+    </div>
+
+    <div class="step" id="stepWhere" hidden>
+      <label class="eyebrow" for="zone">Zone</label>
+      <select id="zone">
+        <option value="">Select zone…</option>
+      </select>
+      <label class="eyebrow" for="city" style="margin-top:14px">Town / area</label>
+      <select id="city" disabled>
+        <option value="">Select zone first</option>
+      </select>
+      <label class="eyebrow" for="note" style="margin-top:14px">Note (optional)</label>
+      <input type="text" id="note" maxlength="60" placeholder="e.g. with ASM, chemist meet">
+    </div>
+
+    <div class="submit" id="stepSubmit" hidden>
+      <button type="submit" id="go">Mark my day</button>
+      <p class="msg" id="msg"></p>
+    </div>
+  </form>
+</main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const state = { mrId: "", status: "", zone: "", city: "" };
+  const KEY_ME = "snt_fb_me";
+  const KEY_DONE = "snt_fb_done";
+
+  $("mastDate").textContent = prettyDateIST();
+
+  /* ---- populate name dropdown ---- */
+  const mrSel = $("mr");
+  MRS.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.name + " · " + m.division;
+    mrSel.appendChild(o);
+  });
+
+  /* ---- status buttons ---- */
+  const sBox = $("statuses");
+  STATUSES.forEach((s) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.code = s.code;
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = '<span class="dot"></span>' + s.label;
+    b.addEventListener("click", () => pickStatus(s.code));
+    sBox.appendChild(b);
+  });
+
+  /* ---- zone dropdown ---- */
+  const zSel = $("zone"), cSel = $("city");
+  ZONE_ORDER.forEach((z) => {
+    const o = document.createElement("option");
+    o.value = z; o.textContent = z;
+    zSel.appendChild(o);
+  });
+
+  zSel.addEventListener("change", () => {
+    state.zone = zSel.value;
+    state.city = "";
+    cSel.innerHTML = "";
+    if (!state.zone) {
+      cSel.disabled = true;
+      cSel.innerHTML = '<option value="">Select zone first</option>';
+    } else {
+      cSel.disabled = false;
+      cSel.appendChild(new Option("Select town…", ""));
+      ZONES[state.zone].forEach((c) => cSel.appendChild(new Option(c, c)));
+    }
+    refresh();
+  });
+  cSel.addEventListener("change", () => { state.city = cSel.value; refresh(); });
+
+  mrSel.addEventListener("change", () => {
+    state.mrId = mrSel.value;
+    if (state.mrId) localStorage.setItem(KEY_ME, state.mrId);
+    $("stepStatus").hidden = !state.mrId;
+    refresh();
+  });
+
+  function pickStatus(code) {
+    state.status = code;
+    [...sBox.children].forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.code === code))
+    );
+    const needsPlace = STATUSES.find((s) => s.code === code).field;
+    $("stepWhere").hidden = !needsPlace;
+    if (!needsPlace) { state.zone = ""; state.city = ""; zSel.value = ""; cSel.value = ""; }
+    refresh();
+  }
+
+  function valid() {
+    if (!state.mrId || !state.status) return false;
+    const needsPlace = STATUSES.find((s) => s.code === state.status).field;
+    return needsPlace ? !!(state.zone && state.city) : true;
+  }
+  function refresh() {
+    $("stepSubmit").hidden = !state.status;
+    $("go").disabled = !valid();
+  }
+
+  /* ---- submit ---- */
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!valid()) return;
+    const btn = $("go"), msg = $("msg");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    msg.className = "msg";
+    msg.textContent = "";
+
+    const mr = MRS.find((m) => m.id === state.mrId);
+    const payload = {
+      date: todayIST(),
+      mrId: mr.id,
+      mrName: mr.name,
+      division: mr.division,
+      status: state.status,
+      zone: state.zone,
+      city: state.city,
+      note: $("note").value.trim(),
+    };
+
+    try {
+      // text/plain keeps this a "simple request" — no CORS preflight,
+      // which Apps Script web apps cannot answer.
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+        redirect: "follow",
+      });
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "Server rejected the entry");
+
+      localStorage.setItem(KEY_DONE, JSON.stringify({ ...payload, time: out.time }));
+      showReceipt({ ...payload, time: out.time }, out.updated);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Mark my day";
+      msg.className = "msg err";
+      msg.textContent = "Could not send — check your connection and press again. (" + err.message + ")";
+    }
+  });
+
+  /* ---- receipt ---- */
+  function showReceipt(d, updated) {
+    const st = STATUSES.find((s) => s.code === d.status);
+    $("receiptTitle").textContent = updated ? "Entry updated" : "Marked for today";
+    $("rName").textContent = d.mrName + " · " + d.division;
+    $("rStatus").textContent = st ? st.label : d.status;
+    if (d.city) {
+      $("rLocLabel").hidden = false; $("rLoc").hidden = false;
+      $("rLoc").textContent = d.city + ", " + d.zone;
+    } else {
+      $("rLocLabel").hidden = true; $("rLoc").hidden = true;
+    }
+    $("rTime").textContent = d.time || "—";
+    $("receipt").hidden = false;
+    $("form").hidden = true;
+    window.scrollTo(0, 0);
+  }
+
+  $("editBtn").addEventListener("click", () => {
+    $("receipt").hidden = true;
+    $("form").hidden = false;
+    $("go").disabled = false;
+    $("go").textContent = "Update my entry";
+  });
+
+  /* ---- restore ---- */
+  const done = JSON.parse(localStorage.getItem(KEY_DONE) || "null");
+  if (done && done.date === todayIST()) {
+    showReceipt(done, false);
+  }
+  const me = localStorage.getItem(KEY_ME);
+  if (me && MRS.some((m) => m.id === me)) {
+    mrSel.value = me;
+    mrSel.dispatchEvent(new Event("change"));
+  }
+})();
+</script>
+</body>
+</html>
