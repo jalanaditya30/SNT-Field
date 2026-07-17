@@ -34,19 +34,18 @@ var MR_SEED = [
   ['mr04', 'Krishna',    'Alkem - Novokem',    'Y'],
   ['mr05', 'Pawan',      'Alkem - Novokem',    'Y'],
   ['mr06', 'Siddharth',  'Alkem - Novokem',    'Y'],
-  ['mr07', 'Prashant',   'Alkem - Novokem',    'Y'],
-  ['mr08', 'Bhavik',     'Alkem - Novokem',    'Y'],
-  ['mr09', 'Shukla',     'Alkem - Maxxio',     'Y'],
-  ['mr10', 'Mandip',     'Alkem - Maxxio',     'Y'],
-  ['mr11', 'Shiv Tiwari','Alkem - Healthcare', 'Y'],
-  ['mr12', 'Arun Dubey', 'Alkem - Healthcare', 'Y'],
-  ['mr13', 'Siddharth',  'Ranbaxy',            'Y'],
-  ['mr14', 'Rahul',      'Ranbaxy',            'Y'],
-  ['mr15', 'Vishal',     'Ranbaxy',            'Y'],
-  ['mr16', 'Nilesh',     'Ranbaxy',            'Y'],
-  ['mr17', 'Vinayak',    'Lupin',              'Y'],
-  ['mr18', 'Haresh',     'Lupin',              'Y'],
-  ['mr19', 'Sanjay',     'Torque',             'Y']
+  ['mr07', 'Bhavik',     'Alkem - Novokem',    'Y'],
+  ['mr08', 'Shukla',     'Alkem - Maxxio',     'Y'],
+  ['mr09', 'Mandip',     'Alkem - Maxxio',     'Y'],
+  ['mr10', 'Shiv Tiwari','Alkem - Healthcare', 'Y'],
+  ['mr11', 'Siddharth',  'Ranbaxy',            'Y'],
+  ['mr12', 'Rahul',      'Ranbaxy',            'Y'],
+  ['mr13', 'Vishal',     'Ranbaxy',            'Y'],
+  ['mr14', 'Nilesh',     'Ranbaxy',            'Y'],
+  ['mr15', 'Vinayak',    'Lupin',              'Y'],
+  ['mr16', 'Haresh',     'Lupin',              'Y'],
+  ['mr17', 'Sanjay',     'Torque',             'Y'],
+  ['mr18', 'Jagdish',    'Torque',             'Y']
 ];
 
 function getSS_() {

@@ -68,13 +68,15 @@
       const r = marked[m.id];
       if (!r) { unmarked.push(m); return; }
       if (r.status === "WORKING") {
-        // An MR can log towns across several zones in one entry.
-        // Group their towns by the zone each town belongs to.
+        // An MR can log towns across several zones in one entry. New marks
+        // store zone and town as aligned lists (same length), so pair them
+        // by position; older marks fall back to the town→zone lookup.
         const towns = splitList(r.city);
-        const declared = splitList(r.zone);
+        const zonesList = splitList(r.zone);
+        const aligned = zonesList.length === towns.length;
         const byZone = {};
-        towns.forEach((t) => {
-          const z = CITY_TO_ZONE[t] || declared[0];
+        towns.forEach((t, i) => {
+          const z = aligned ? zonesList[i] : (CITY_TO_ZONE[t] || zonesList[0]);
           if (z && buckets[z]) (byZone[z] = byZone[z] || []).push(t);
         });
         Object.keys(byZone).forEach((z) => {

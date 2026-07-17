@@ -19,67 +19,75 @@ let MRS = [
   { id: "mr04", name: "Krishna",     division: "Alkem - Novokem" },
   { id: "mr05", name: "Pawan",       division: "Alkem - Novokem" },
   { id: "mr06", name: "Siddharth",   division: "Alkem - Novokem" },
-  { id: "mr07", name: "Prashant",    division: "Alkem - Novokem" },
-  { id: "mr08", name: "Bhavik",      division: "Alkem - Novokem" },
-  { id: "mr09", name: "Shukla",      division: "Alkem - Maxxio" },
-  { id: "mr10", name: "Mandip",      division: "Alkem - Maxxio" },
-  { id: "mr11", name: "Shiv Tiwari", division: "Alkem - Healthcare" },
-  { id: "mr12", name: "Arun Dubey",  division: "Alkem - Healthcare" },
-  { id: "mr13", name: "Siddharth",   division: "Ranbaxy" },
-  { id: "mr14", name: "Rahul",       division: "Ranbaxy" },
-  { id: "mr15", name: "Vishal",      division: "Ranbaxy" },
-  { id: "mr16", name: "Nilesh",      division: "Ranbaxy" },
-  { id: "mr17", name: "Vinayak",     division: "Lupin" },
-  { id: "mr18", name: "Haresh",      division: "Lupin" },
-  { id: "mr19", name: "Sanjay",      division: "Torque" },
+  { id: "mr07", name: "Bhavik",      division: "Alkem - Novokem" },
+  { id: "mr08", name: "Shukla",      division: "Alkem - Maxxio" },
+  { id: "mr09", name: "Mandip",      division: "Alkem - Maxxio" },
+  { id: "mr10", name: "Shiv Tiwari", division: "Alkem - Healthcare" },
+  { id: "mr11", name: "Siddharth",   division: "Ranbaxy" },
+  { id: "mr12", name: "Rahul",       division: "Ranbaxy" },
+  { id: "mr13", name: "Vishal",      division: "Ranbaxy" },
+  { id: "mr14", name: "Nilesh",      division: "Ranbaxy" },
+  { id: "mr15", name: "Vinayak",     division: "Lupin" },
+  { id: "mr16", name: "Haresh",      division: "Lupin" },
+  { id: "mr17", name: "Sanjay",      division: "Torque" },
+  { id: "mr18", name: "Jagdish",     division: "Torque" },
 ];
 let MRS_SOURCE = "fallback";
 
-/* 4. Zones and towns — from Gujarat_MR_Zones.xlsx.
+/* 4. Zones and towns — from Gujarat_MR_Towns_Mapped.xlsx.
       Add a town here, then push to GitHub. An MR can pick several towns
-      across several zones in one day (multi-select on the form). */
+      across several zones in one day (multi-select on the form).
+      Note: a town may sit in two zones (e.g. Gandhinagar), so each mark
+      records the zone the town was picked under — see index.html. */
 const ZONES = {
   "Ahmedabad": [
-    "Sabarmati", "Bopal",
+    "Maninagar", "Narol-Naroda", "Paldi - Ratnamani", "Chandkhera - Gota", "Gandhinagar",
   ],
   "North Gujarat": [
-    "Gandhinagar", "Mehsana", "Patan", "Palanpur",
-    "Himmatnagar", "Modasa", "Unjha", "Visnagar", "Kadi",
-  ],
-  "Central Gujarat": [
-    "Vadodara", "Anand", "Nadiad", "Godhra", "Dahod",
-    "Halol", "Kapadvanj", "Mahisagar",
+    "Bechraji", "Chanasma", "Chhatral", "Deesa", "Dehgam", "Deodar", "Dhanera",
+    "Diyodar", "Gandhinagar", "Harij", "Himmatnagar", "Idar", "Kadi", "Kalol",
+    "Mansa", "Mehsana", "Modasa", "Palanpur", "Patan", "Prantij", "Radhanpur",
+    "Sanand", "Satlasana", "Shihori", "Thara", "Tharad", "Vadali", "Vadgam",
+    "Vijapur", "Viramgam", "Visnagar",
   ],
   "South Gujarat": [
-    "Surat", "Navsari", "Valsad", "Bharuch", "Vapi",
-    "Ankleshwar", "Bilimora", "Vyara", "Ahwa",
+    "Anand", "Asodar", "Balasinor", "Baria", "Borsad", "Dahod", "Dakor",
+    "Godhra", "Halol", "Jhalod", "Kapadvanj", "Khambhat", "Lunavada", "Nadiad",
+    "Sevalia", "Vadodara", "Ankleshwar", "Bardoli", "Bharuch", "Chikhli",
+    "Dharampur", "Kosamba", "Navsari", "Palej", "Silvasa", "Songadh", "Surat",
+    "Valsad", "Vansda", "Vapi", "Vyara",
   ],
-  "Saurashtra & Kutch": [
-    "Rajkot", "Jamnagar", "Junagadh", "Bhavnagar", "Porbandar",
-    "Morbi", "Gondal", "Amreli", "Surendranagar", "Bhuj", "Gandhidham",
+  "Saurashtra": [
+    "Amreli", "Babra", "Bagasara", "Bhavnagar", "Bhuj", "Botad", "Chorwad",
+    "Dhoraji", "Dhrangadhra", "Gadhda", "Gandhidham", "Gariadhar", "Gondal",
+    "Halvad", "Jamkhambhalia", "Jamnagar", "Jasdan", "Jetpur", "Junagadh",
+    "Kalavad", "Keshod", "Kodinar", "Limdi", "Mahuva", "Mandvi-Kutch",
+    "Mangrol", "Morbi", "Palitana", "Porbandar", "Prachi", "Rajkot", "Rajula",
+    "Rapar", "Savarkundla", "Sihor", "Surendranagar", "Talaja", "Talala",
+    "Una", "Veraval", "Wankaner",
   ],
 };
 
 /* Order the zones appear on the form */
-const ZONE_ORDER = ["Ahmedabad", "North Gujarat", "Central Gujarat", "South Gujarat", "Saurashtra & Kutch"];
+const ZONE_ORDER = ["Ahmedabad", "North Gujarat", "South Gujarat", "Saurashtra"];
 
 /* Order the zones appear on the dashboard */
-const BOARD_ORDER = ["Ahmedabad", "North Gujarat", "Central Gujarat", "Saurashtra & Kutch", "South Gujarat"];
+const BOARD_ORDER = ["Ahmedabad", "North Gujarat", "South Gujarat", "Saurashtra"];
 
 const ZONE_KEY = {
-  "Ahmedabad":          { var: "--z-ahmedabad" },
-  "North Gujarat":      { var: "--z-north" },
-  "Central Gujarat":    { var: "--z-central" },
-  "South Gujarat":      { var: "--z-south" },
-  "Saurashtra & Kutch": { var: "--z-west" },
+  "Ahmedabad":     { var: "--z-ahmedabad" },
+  "North Gujarat": { var: "--z-north" },
+  "South Gujarat": { var: "--z-south" },
+  "Saurashtra":    { var: "--z-west" },
 };
 
-/* Which zone each town belongs to — built once from ZONES so the
-   dashboard can place an MR under the right zone even when they logged
-   towns across several zones in one entry. */
+/* Which zone each town belongs to — a fallback for older marks that
+   didn't record a zone per town. A town in two zones resolves to the
+   last zone listed above; new marks store the exact zone, so this only
+   affects legacy rows. */
 const CITY_TO_ZONE = {};
 Object.keys(ZONES).forEach(function (z) {
-  ZONES[z].forEach(function (c) { CITY_TO_ZONE[c] = z; });
+  ZONES[z].forEach(function (c) { if (!(c in CITY_TO_ZONE)) CITY_TO_ZONE[c] = z; });
 });
 
 /* Split a stored comma-joined field ("Sabarmati, Bopal") into a clean list. */
