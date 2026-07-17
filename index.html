@@ -83,7 +83,7 @@
 <script>
 (async function () {
   const $ = (id) => document.getElementById(id);
-  const state = { mrId: "", status: "", zones: [], cities: [] };
+  const state = { mrId: "", status: "", zones: [], picks: [] };  // picks: [{zone, city}]
   const KEY_ME = "snt_fb_me";
   const KEY_DONE = "snt_fb_done";
 
@@ -91,6 +91,17 @@
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // Turn aligned zone/town lists into "Maninagar, Gandhinagar (Ahmedabad) · Mehsana (North Gujarat)".
+  function formatWhere(zoneStr, cityStr) {
+    const zs = splitList(zoneStr), cs = splitList(cityStr);
+    if (cs.length && zs.length === cs.length) {
+      const byZone = {}, order = [];
+      cs.forEach((c, i) => { const z = zs[i]; if (!(z in byZone)) { byZone[z] = []; order.push(z); } byZone[z].push(c); });
+      return order.map((z) => byZone[z].join(", ") + " (" + z + ")").join("  ·  ");
+    }
+    return cityStr + (zoneStr ? "  ·  " + zoneStr : "");   // legacy fallback
+  }
 
   /* ---- MR list: show cached / built-in names instantly, then refresh
           from the Master tab in the background (no blank wait) ---- */
@@ -145,7 +156,7 @@
     const i = state.zones.indexOf(z);
     if (i >= 0) {
       state.zones.splice(i, 1);
-      state.cities = state.cities.filter((c) => CITY_TO_ZONE[c] !== z);
+      state.picks = state.picks.filter((p) => p.zone !== z);
       btn.setAttribute("aria-pressed", "false");
     } else {
       state.zones.push(z);
@@ -177,9 +188,9 @@
         const b = document.createElement("button");
         b.type = "button"; b.className = "chip";
         b.style.setProperty("--cc", "var(" + ZONE_KEY[z].var + ")");
-        b.setAttribute("aria-pressed", String(state.cities.includes(c)));
+        b.setAttribute("aria-pressed", String(state.picks.some((p) => p.zone === z && p.city === c)));
         b.innerHTML = '<span class="tick"></span>' + esc(c);
-        b.addEventListener("click", () => toggleCity(c, b));
+        b.addEventListener("click", () => toggleCity(z, c, b));
         chips.appendChild(b);
       });
       block.appendChild(chips);
@@ -187,10 +198,10 @@
     });
   }
 
-  function toggleCity(c, btn) {
-    const i = state.cities.indexOf(c);
-    if (i >= 0) { state.cities.splice(i, 1); btn.setAttribute("aria-pressed", "false"); }
-    else { state.cities.push(c); btn.setAttribute("aria-pressed", "true"); }
+  function toggleCity(z, c, btn) {
+    const i = state.picks.findIndex((p) => p.zone === z && p.city === c);
+    if (i >= 0) { state.picks.splice(i, 1); btn.setAttribute("aria-pressed", "false"); }
+    else { state.picks.push({ zone: z, city: c }); btn.setAttribute("aria-pressed", "true"); }
     refresh();
   }
 
@@ -211,7 +222,7 @@
     if (needsPlace) {
       if (!$("townWrap").children.length) renderTowns();
     } else {
-      state.zones = []; state.cities = [];
+      state.zones = []; state.picks = [];
       [...zBox.children].forEach((b) => b.setAttribute("aria-pressed", "false"));
       renderTowns();
     }
@@ -221,7 +232,7 @@
   function valid() {
     if (!state.mrId || !state.status) return false;
     const needsPlace = STATUSES.find((s) => s.code === state.status).field;
-    return needsPlace ? state.cities.length > 0 : true;
+    return needsPlace ? state.picks.length > 0 : true;
   }
   function refresh() {
     $("stepSubmit").hidden = !state.status;
@@ -239,15 +250,20 @@
     msg.textContent = "";
 
     const mr = MRS.find((m) => m.id === state.mrId);
-    const zonesUsed = ZONE_ORDER.filter((z) => state.cities.some((c) => CITY_TO_ZONE[c] === z));
+    // Emit town + zone as aligned lists (same length), ordered by zone then
+    // town, so a town that lives in two zones keeps the zone it was picked in.
+    const ordered = [];
+    ZONE_ORDER.forEach((z) => ZONES[z].forEach((c) => {
+      if (state.picks.some((p) => p.zone === z && p.city === c)) ordered.push({ zone: z, city: c });
+    }));
     const payload = {
       date: todayIST(),
       mrId: mr.id,
       mrName: mr.name,
       division: mr.division,
       status: state.status,
-      zone: zonesUsed.join(", "),
-      city: state.cities.join(", "),
+      zone: ordered.map((p) => p.zone).join(", "),
+      city: ordered.map((p) => p.city).join(", "),
       note: $("note").value.trim(),
     };
 
@@ -281,7 +297,7 @@
     $("rStatus").textContent = st ? st.label : d.status;
     if (d.city) {
       $("rLocLabel").hidden = false; $("rLoc").hidden = false;
-      $("rLoc").textContent = d.city + (d.zone ? "  ·  " + d.zone : "");
+      $("rLoc").textContent = formatWhere(d.zone, d.city);
     } else {
       $("rLocLabel").hidden = true; $("rLoc").hidden = true;
     }
