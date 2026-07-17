@@ -15,7 +15,7 @@
    From the SHEET's URL, not the script's:
    docs.google.com/spreadsheets/d/[ THIS LONG STRING ]/edit
    ============================================================ */
-var SHEET_ID = '';
+var SHEET_ID = '1mZpRIxnLtrwLBfgSthXK12ypamdUrmm7m_YjOKZlILM';
 
 var LOG_SHEET    = 'Log';
 var MASTER_SHEET = 'Master';
