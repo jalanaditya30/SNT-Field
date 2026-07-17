@@ -25,6 +25,30 @@ var HEADERS = ['Timestamp', 'Date', 'Time', 'MR ID', 'MR Name', 'Division',
                'Status', 'Zone', 'City', 'Note'];
 var MASTER_HEADERS = ['MR ID', 'MR Name', 'Division', 'Active'];
 
+/* The MR roster. Edit here and run SETUP_resetMasterTab() to apply, or
+   just edit the Master tab directly (add a row / set Active to N). */
+var MR_SEED = [
+  ['mr01', 'Rohit',      'Alkem - Novokem',    'Y'],
+  ['mr02', 'Hiten',      'Alkem - Novokem',    'Y'],
+  ['mr03', 'Jayesh',     'Alkem - Novokem',    'Y'],
+  ['mr04', 'Krishna',    'Alkem - Novokem',    'Y'],
+  ['mr05', 'Pawan',      'Alkem - Novokem',    'Y'],
+  ['mr06', 'Siddharth',  'Alkem - Novokem',    'Y'],
+  ['mr07', 'Prashant',   'Alkem - Novokem',    'Y'],
+  ['mr08', 'Bhavik',     'Alkem - Novokem',    'Y'],
+  ['mr09', 'Shukla',     'Alkem - Maxxio',     'Y'],
+  ['mr10', 'Mandip',     'Alkem - Maxxio',     'Y'],
+  ['mr11', 'Shiv Tiwari','Alkem - Healthcare', 'Y'],
+  ['mr12', 'Arun Dubey', 'Alkem - Healthcare', 'Y'],
+  ['mr13', 'Siddharth',  'Ranbaxy',            'Y'],
+  ['mr14', 'Rahul',      'Ranbaxy',            'Y'],
+  ['mr15', 'Vishal',     'Ranbaxy',            'Y'],
+  ['mr16', 'Nilesh',     'Ranbaxy',            'Y'],
+  ['mr17', 'Vinayak',    'Lupin',              'Y'],
+  ['mr18', 'Haresh',     'Lupin',              'Y'],
+  ['mr19', 'Sanjay',     'Torque',             'Y']
+];
+
 function getSS_() {
   if (SHEET_ID) return SpreadsheetApp.openById(SHEET_ID);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -69,32 +93,23 @@ function timeStr_(v) {
 }
 
 /* ============================================================
-   THE INDEX — why this stays fast forever
+   ONE ROW PER MR PER DAY
 
-   The Log is append-only and chronological, so every row for a given
-   date sits in one unbroken block. We remember the row number where
-   each date's block starts. doGet then reads only that block instead
-   of the whole sheet. Day 1 and year 5 cost the same.
+   Each MR gets one row per day. Marking again the same day overwrites
+   that day's row (time, status, zone, towns, note); a new day starts a
+   new row. So the board shows today, and past days stay on the sheet as
+   history — one row per MR per day.
    ============================================================ */
-function startRowFor_(sh, date) {
-  var props = PropertiesService.getScriptProperties();
-  var key = 'start_' + date;
-  var cached = props.getProperty(key);
-  if (cached) return Number(cached);
-
-  // Not indexed (old rows, or index cleared) — scan the Date column once,
-  // bottom-up, then remember the answer so we never scan again.
+function findMrRow_(sh, mrId, date) {
   var last = sh.getLastRow();
   if (last < 2) return 0;
-  var dates = sh.getRange(2, 2, last - 1, 1).getValues();
-  var first = 0;
-  for (var i = dates.length - 1; i >= 0; i--) {
-    var d = dateStr_(dates[i][0]);
-    if (d === date) first = i + 2;      // +2: skip header, 1-indexed rows
-    else if (first) break;              // walked past the top of the block
+  var vals = sh.getRange(2, 2, last - 1, 3).getValues();   // Date, Time, MR ID
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][2]) === String(mrId) && dateStr_(vals[i][0]) === date) {
+      return i + 2;                                         // 1-indexed, skip header
+    }
   }
-  if (first) props.setProperty(key, String(first));
-  return first;
+  return 0;
 }
 
 /* ---------------- WRITE ---------------- */
@@ -114,26 +129,21 @@ function doPost(e) {
     var time = Utilities.formatDate(now, TZ, 'HH:mm');
     var sh   = getLog_();
 
-    var start = startRowFor_(sh, date);
-    var updated = false;
-    if (start) {
-      var last = sh.getLastRow();
-      var ids = sh.getRange(start, 4, last - start + 1, 1).getValues();  // MR ID column only
-      for (var i = 0; i < ids.length; i++) {
-        if (String(ids[i][0]) === String(d.mrId)) { updated = true; break; }
-      }
-    }
-
-    sh.appendRow([
+    var rowData = [
       now, date, time,
-      d.mrId, d.mrName || '', d.division || '',
+      String(d.mrId), d.mrName || '', d.division || '',
       d.status, d.zone || '', d.city || '',
       String(d.note || '').slice(0, 60)
-    ]);
+    ];
 
-    // First row of a new day? Record where the block starts.
-    if (!start) {
-      PropertiesService.getScriptProperties().setProperty('start_' + date, String(sh.getLastRow()));
+    // Overwrite this MR's row for today, or add one if they haven't
+    // marked today yet (a new day always starts a fresh row).
+    var row = findMrRow_(sh, d.mrId, date);
+    var updated = !!row;                  // already marked today → this is a change
+    if (row) {
+      sh.getRange(row, 1, 1, HEADERS.length).setValues([rowData]);
+    } else {
+      sh.appendRow(rowData);
     }
 
     // A new mark makes the cached board stale — clear today's cache so
@@ -171,14 +181,13 @@ function getMaster_() {
 
 function readRows_(want) {
   var sh = getLog_();
-  var start = startRowFor_(sh, want);
+  var last = sh.getLastRow();
   var rows = [];
-  if (start) {
-    var last = sh.getLastRow();
-    var vals = sh.getRange(start, 1, last - start + 1, HEADERS.length).getValues();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
     for (var i = 0; i < vals.length; i++) {
       var r = vals[i];
-      if (dateStr_(r[1]) !== want) continue;   // guard against a stale index
+      if (dateStr_(r[1]) !== want) continue;   // only rows marked for this date
       rows.push({
         date: dateStr_(r[1]), time: timeStr_(r[2]),
         mrId: String(r[3]), mrName: String(r[4]), division: String(r[5]),
@@ -239,14 +248,36 @@ function SETUP_createMasterTab() {
     sh = ss.insertSheet(MASTER_SHEET);
     sh.getRange(1, 1, 1, 4).setValues([MASTER_HEADERS]).setFontWeight('bold');
     sh.setFrozenRows(1);
-    sh.appendRow(['mr01', 'Rohit',    'LCM',      'Y']);
-    sh.appendRow(['mr02', 'Sukla ji', 'LCM',      'Y']);
-    sh.appendRow(['mr03', 'MR Three', 'Novocamp', 'Y']);
-    sh.appendRow(['mr04', 'MR Four',  'Novocamp', 'Y']);
+    sh.getRange(2, 1, MR_SEED.length, 4).setValues(MR_SEED);
     sh.setColumnWidth(2, 180);
   }
   Logger.log('Master tab ready. Active MRs: ' + getMaster_().length);
   Logger.log(JSON.stringify(getMaster_(), null, 1));
+}
+
+/* Replace the whole Master tab with MR_SEED above — removes the old MRs
+   and writes the current roster. Run this once after editing MR_SEED. */
+function SETUP_resetMasterTab() {
+  var ss = getSS_();
+  var sh = ss.getSheetByName(MASTER_SHEET) || ss.insertSheet(MASTER_SHEET);
+  var last = sh.getLastRow();
+  if (last >= 1) sh.getRange(1, 1, last, 4).clearContent();
+  sh.getRange(1, 1, 1, 4).setValues([MASTER_HEADERS]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  sh.getRange(2, 1, MR_SEED.length, 4).setValues(MR_SEED);
+  sh.setColumnWidth(2, 180);
+  cacheDel_('c_config');   // so the new list shows on the next load
+  Logger.log('Master reset. Active MRs: ' + getMaster_().length);
+}
+
+/* Wipe all mark rows from Log (keeps the header). Use when starting
+   fresh — e.g. after swapping the MR roster — so no stale rows linger. */
+function SETUP_clearLog() {
+  var sh = getLog_();
+  var last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, HEADERS.length).clearContent();
+  CacheService.getScriptCache().removeAll(['c_full_' + today_(), 'c_rows_' + today_()]);
+  Logger.log('Log cleared. Rows now: ' + (getLog_().getLastRow() - 1));
 }
 
 /* ---------------- DIAGNOSTICS ---------------- */
@@ -269,11 +300,27 @@ function TEST_writeRow() {
   Logger.log('Sheet: "' + getSS_().getName() + '"  |  rows now: ' + getLog_().getLastRow());
 }
 
-/* Rebuild the date index from scratch. Run this ONLY if you have
-   sorted, deleted, or inserted rows in Log and the board looks wrong. */
-function FIX_rebuildIndex() {
-  PropertiesService.getScriptProperties().deleteAllProperties();
-  Logger.log('Index cleared. It rebuilds itself on the next read — nothing else to do.');
+/* Collapse an existing append-only Log to one row per MR per day
+   (keeping each MR's latest row for each date). Run once when migrating
+   old data. Safe to re-run. */
+function SETUP_collapseToOnePerMrPerDay() {
+  var sh = getLog_();
+  var last = sh.getLastRow();
+  if (last < 2) { Logger.log('Log is already empty — nothing to collapse.'); return; }
+  var vals = sh.getRange(2, 1, last - 1, HEADERS.length).getValues();
+  var byKey = {}, order = [];
+  vals.forEach(function (r) {
+    var id = String(r[3]);
+    if (!id) return;
+    var key = id + '|' + dateStr_(r[1]);   // one row per MR per date
+    if (!(key in byKey)) order.push(key);
+    byKey[key] = r;                        // last row seen for that MR+date wins
+  });
+  var out = order.map(function (k) { return byKey[k]; });
+  sh.getRange(2, 1, last - 1, HEADERS.length).clearContent();
+  if (out.length) sh.getRange(2, 1, out.length, HEADERS.length).setValues(out);
+  PropertiesService.getScriptProperties().deleteAllProperties();  // drop any old date index
+  Logger.log('Collapsed ' + (last - 1) + ' rows to ' + out.length + ' (one per MR per day).');
 }
 
 /* ---------------- OPTIONAL: 11:05 snapshot ----------------
