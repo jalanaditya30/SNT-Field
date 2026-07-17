@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* 1. Paste your Apps Script Web App URL here (ends with /exec) */
-const API_URL = "https://script.google.com/macros/s/AKfycbyqntiCfqIIlydIso08x5bnsY5lRsBmSLQCLq9I1tAP8qkZKbT0jmTYXG2ZbqYqDqK2/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwCM-2r1-WTmYQCjhkXZFZk9DB9xZv-s7pnXaqB1no31TQVlwkYv9lgSQ2dl6dbCGvs/exec";
 
 /* 2. Cutoff hour (24h, IST). Entries after this are tagged LATE. */
 const CUTOFF_HOUR = 11;
