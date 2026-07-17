@@ -86,5 +86,6 @@ Towns change roughly never, so they stay in code. Edit `ZONES` in `data.js`, pus
 
 ## Notes
 
+- **Leave is marked once for the whole period.** When an MR picks *On leave*, a From/To calendar appears. The backend writes one `LEAVE` row per day in that range, so the board shows them on leave every day without anyone re-marking — and the office isn't left calling someone who's on holiday. Working any of those days simply overwrites that day's row. Ranges are capped at 92 days.
 - **No login.** Anyone with the link can mark as anyone. This is deliberate — it's a coordination board, not attendance for payroll. If it gets abused, the fix is per-MR links (`?id=mr07`), not passwords.
 - **The phone remembers the MR's name** after the first use, so day 2 onward is: open link → tap status → tap town → send.
