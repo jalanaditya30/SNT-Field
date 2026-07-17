@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 AM Board — SNT Field Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="mast">
+  <h1>SNT <span>/ 11 AM Board</span></h1>
+  <div class="date" id="mastDate"></div>
+</div>
+
+<div class="tally">
+  <strong class="big" id="cnt">–</strong>
+  <span class="of" id="of">of – marked</span>
+  <span class="bar"><i id="bar" style="width:0%"></i></span>
+  <button class="refresh" id="refreshBtn">Refresh</button>
+</div>
+
+<main class="board" id="board"></main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  $("mastDate").textContent = prettyDateIST();
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
+    );
+  }
+  function isLate(t) {
+    const h = parseInt(String(t || "").split(":")[0], 10);
+    return Number.isFinite(h) && h >= CUTOFF_HOUR;
+  }
+  const lateTag = (t) => (isLate(t) ? '<span class="tag-late">LATE</span>' : "");
+  const nameCell = (n, d) =>
+    `<span class="nm">${esc(n)}<span class="dv">${esc(d)}</span></span>`;
+
+  function boxHTML(cls, style, title, count, inner) {
+    return `<section class="box ${cls}"${style}>
+      <header><h2>${esc(title)}</h2><span class="n">${count}</span></header>
+      ${inner}</section>`;
+  }
+
+  function render(rows) {
+    const marked = {};
+    rows.forEach((r) => { marked[r.mrId] = r; });   // last row per MR wins
+
+    const buckets = {};
+    BOARD_ORDER.forEach((z) => (buckets[z] = []));
+    const offField = [], unmarked = [];
+
+    MRS.forEach((m) => {
+      const r = marked[m.id];
+      if (!r) { unmarked.push(m); return; }
+      if (r.status === "WORKING" && buckets[r.zone]) buckets[r.zone].push(r);
+      else offField.push(r);
+    });
+
+    const total = MRS.length, done = total - unmarked.length;
+    $("cnt").textContent = done;
+    $("of").textContent = "of " + total + " marked";
+    $("bar").style.width = (total ? (done / total) * 100 : 0) + "%";
+
+    let html = "";
+
+    // --- the map: 2x2 ---
+    BOARD_ORDER.forEach((z) => {
+      const list = buckets[z];
+      const inner = list.length
+        ? "<ul>" + list.map((r) =>
+            `<li>${nameCell(r.mrName, r.division)}<span class="loc">${esc(r.city)}${lateTag(r.time)}</span></li>`
+          ).join("") + "</ul>"
+        : '<p class="empty">Nobody in this zone today.</p>';
+      html += boxHTML("zone", ` style="--zc:var(${ZONE_KEY[z].var})"`, z, list.length, inner);
+    });
+
+    html += '<div class="rule"></div>';
+
+    // --- summary row ---
+    const LBL = { HQ: "Travelling to HQ", OFFICE: "SNT Office", LEAVE: "On leave" };
+    html += boxHTML("offfield", "", "Not in field — declared", offField.length,
+      offField.length
+        ? "<ul>" + offField.map((r) =>
+            `<li>${nameCell(r.mrName, r.division)}<span class="loc">${esc(LBL[r.status] || r.status)}${lateTag(r.time)}</span></li>`
+          ).join("") + "</ul>"
+        : '<p class="empty">Everyone is in the field.</p>'
+    );
+
+    html += boxHTML("unmarked" + (unmarked.length ? "" : " clear"), "", "Not marked — call these", unmarked.length,
+      unmarked.length
+        ? "<ul>" + unmarked.map((m) => `<li>${nameCell(m.name, m.division)}</li>`).join("") + "</ul>"
+        : `<p class="empty">All ${total} marked. Nothing to chase.</p>`
+    );
+
+    $("board").innerHTML = html;
+  }
+
+  async function load() {
+    const b = $("refreshBtn");
+    b.textContent = "Loading…";
+    try {
+      await loadMaster();   // live MR list from the Master tab
+      const res = await fetch(API_URL + "?date=" + todayIST() + "&t=" + Date.now(), { redirect: "follow" });
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "load failed");
+      render(out.rows || []);
+      b.textContent = MRS_SOURCE === "sheet" ? "Refresh" : "Refresh · old list";
+      b.title = MRS_SOURCE === "sheet" ? "" :
+        "Could not read the Master tab — showing the built-in MR list, which may be out of date.";
+    } catch (e) {
+      b.textContent = "Retry";
+      $("board").innerHTML =
+        '<section class="box unmarked" style="grid-column:1/-1"><header><h2>Board did not load</h2></header>' +
+        '<p class="empty">' + esc(e.message) + ' — press Retry.</p></section>';
+    }
+  }
+
+  $("refreshBtn").addEventListener("click", load);
+  load();
+  setInterval(load, 60000);
+})();
+</script>
+</body>
+</html>
