@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ECEEEA">
+<meta name="theme-color" content="#EEF1EC">
 <title>Mark your day — SNT Field Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,20 +12,29 @@
 </head>
 <body>
 
-<div class="mast">
-  <h1>SNT <span>/ Field Board</span></h1>
-  <div class="date" id="mastDate"></div>
-</div>
+<header class="mast">
+  <div class="brand">
+    <div class="logo">SNT</div>
+    <div class="tt">
+      <span class="co">Shree Narayani Traders</span>
+      <h1>Field Board</h1>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
+    <div class="date" id="mastDate"></div>
+    <a class="pill" href="dashboard.html">▦&nbsp; Live board</a>
+  </div>
+</header>
 
 <main class="wrap">
 
   <!-- receipt shown after a successful mark -->
   <section class="receipt" id="receipt" hidden>
-    <h2 id="receiptTitle">Marked for today</h2>
+    <div class="rok"><span class="check">✓</span><h2 id="receiptTitle">Marked for today</h2></div>
     <dl>
       <dt>Name</dt><dd id="rName"></dd>
       <dt>Status</dt><dd id="rStatus"></dd>
-      <dt id="rLocLabel">Location</dt><dd id="rLoc"></dd>
+      <dt id="rLocLabel">Where</dt><dd id="rLoc"></dd>
       <dt>Time</dt><dd id="rTime"></dd>
     </dl>
     <button class="linkbtn" id="editBtn">Change today's entry</button>
@@ -45,15 +54,13 @@
     </div>
 
     <div class="step" id="stepWhere" hidden>
-      <label class="eyebrow" for="zone">Zone</label>
-      <select id="zone">
-        <option value="">Select zone…</option>
-      </select>
-      <label class="eyebrow" for="city" style="margin-top:14px">Town / area</label>
-      <select id="city" disabled>
-        <option value="">Select zone first</option>
-      </select>
-      <label class="eyebrow" for="note" style="margin-top:14px">Note (optional)</label>
+      <span class="eyebrow">Zones <span class="req">— pick one or more</span></span>
+      <div class="chips" id="zoneChips"></div>
+
+      <span class="eyebrow" style="margin-top:18px">Towns / areas <span class="req">— pick all you'll cover</span></span>
+      <div id="townWrap"></div>
+
+      <label class="eyebrow" for="note" style="margin-top:18px">Note (optional)</label>
       <input type="text" id="note" maxlength="60" placeholder="e.g. with ASM, chemist meet">
     </div>
 
@@ -62,17 +69,28 @@
       <p class="msg" id="msg"></p>
     </div>
   </form>
+
+  <a class="boardlink" href="dashboard.html">
+    <div class="bl-txt">
+      <strong>See who's in the field</strong>
+      <span>Live board — who is working in which town today</span>
+    </div>
+    <span class="bl-go">→</span>
+  </a>
 </main>
 
 <script src="data.js"></script>
 <script>
 (async function () {
   const $ = (id) => document.getElementById(id);
-  const state = { mrId: "", status: "", zone: "", city: "" };
+  const state = { mrId: "", status: "", zones: [], cities: [] };
   const KEY_ME = "snt_fb_me";
   const KEY_DONE = "snt_fb_done";
 
   $("mastDate").textContent = prettyDateIST();
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   /* ---- live MR list from the Master tab; built-in list if offline ---- */
   const mrSel = $("mr");
@@ -100,29 +118,70 @@
     sBox.appendChild(b);
   });
 
-  /* ---- zone dropdown ---- */
-  const zSel = $("zone"), cSel = $("city");
+  /* ---- zone chips (multi-select) ---- */
+  const zBox = $("zoneChips");
   ZONE_ORDER.forEach((z) => {
-    const o = document.createElement("option");
-    o.value = z; o.textContent = z;
-    zSel.appendChild(o);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.zone = z;
+    b.style.setProperty("--cc", "var(" + ZONE_KEY[z].var + ")");
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = '<span class="tick"></span>' + esc(z);
+    b.addEventListener("click", () => toggleZone(z, b));
+    zBox.appendChild(b);
   });
 
-  zSel.addEventListener("change", () => {
-    state.zone = zSel.value;
-    state.city = "";
-    cSel.innerHTML = "";
-    if (!state.zone) {
-      cSel.disabled = true;
-      cSel.innerHTML = '<option value="">Select zone first</option>';
+  function toggleZone(z, btn) {
+    const i = state.zones.indexOf(z);
+    if (i >= 0) {
+      state.zones.splice(i, 1);
+      state.cities = state.cities.filter((c) => CITY_TO_ZONE[c] !== z);
+      btn.setAttribute("aria-pressed", "false");
     } else {
-      cSel.disabled = false;
-      cSel.appendChild(new Option("Select town…", ""));
-      ZONES[state.zone].forEach((c) => cSel.appendChild(new Option(c, c)));
+      state.zones.push(z);
+      btn.setAttribute("aria-pressed", "true");
     }
+    renderTowns();
     refresh();
-  });
-  cSel.addEventListener("change", () => { state.city = cSel.value; refresh(); });
+  }
+
+  /* ---- town chips (multi-select), grouped by the chosen zones ---- */
+  function renderTowns() {
+    const wrap = $("townWrap");
+    wrap.innerHTML = "";
+    const picked = ZONE_ORDER.filter((z) => state.zones.includes(z));
+    if (!picked.length) {
+      wrap.innerHTML = '<p class="emptytowns">Pick a zone above to choose towns.</p>';
+      return;
+    }
+    picked.forEach((z) => {
+      const block = document.createElement("div");
+      block.className = "townzone";
+      block.style.setProperty("--cc", "var(" + ZONE_KEY[z].var + ")");
+      const lbl = document.createElement("div");
+      lbl.className = "zlabel"; lbl.textContent = z;
+      block.appendChild(lbl);
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      ZONES[z].forEach((c) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "chip";
+        b.style.setProperty("--cc", "var(" + ZONE_KEY[z].var + ")");
+        b.setAttribute("aria-pressed", String(state.cities.includes(c)));
+        b.innerHTML = '<span class="tick"></span>' + esc(c);
+        b.addEventListener("click", () => toggleCity(c, b));
+        chips.appendChild(b);
+      });
+      block.appendChild(chips);
+      wrap.appendChild(block);
+    });
+  }
+
+  function toggleCity(c, btn) {
+    const i = state.cities.indexOf(c);
+    if (i >= 0) { state.cities.splice(i, 1); btn.setAttribute("aria-pressed", "false"); }
+    else { state.cities.push(c); btn.setAttribute("aria-pressed", "true"); }
+    refresh();
+  }
 
   mrSel.addEventListener("change", () => {
     state.mrId = mrSel.value;
@@ -138,14 +197,20 @@
     );
     const needsPlace = STATUSES.find((s) => s.code === code).field;
     $("stepWhere").hidden = !needsPlace;
-    if (!needsPlace) { state.zone = ""; state.city = ""; zSel.value = ""; cSel.value = ""; }
+    if (needsPlace) {
+      if (!$("townWrap").children.length) renderTowns();
+    } else {
+      state.zones = []; state.cities = [];
+      [...zBox.children].forEach((b) => b.setAttribute("aria-pressed", "false"));
+      renderTowns();
+    }
     refresh();
   }
 
   function valid() {
     if (!state.mrId || !state.status) return false;
     const needsPlace = STATUSES.find((s) => s.code === state.status).field;
-    return needsPlace ? !!(state.zone && state.city) : true;
+    return needsPlace ? state.cities.length > 0 : true;
   }
   function refresh() {
     $("stepSubmit").hidden = !state.status;
@@ -163,14 +228,15 @@
     msg.textContent = "";
 
     const mr = MRS.find((m) => m.id === state.mrId);
+    const zonesUsed = ZONE_ORDER.filter((z) => state.cities.some((c) => CITY_TO_ZONE[c] === z));
     const payload = {
       date: todayIST(),
       mrId: mr.id,
       mrName: mr.name,
       division: mr.division,
       status: state.status,
-      zone: state.zone,
-      city: state.city,
+      zone: zonesUsed.join(", "),
+      city: state.cities.join(", "),
       note: $("note").value.trim(),
     };
 
@@ -204,7 +270,7 @@
     $("rStatus").textContent = st ? st.label : d.status;
     if (d.city) {
       $("rLocLabel").hidden = false; $("rLoc").hidden = false;
-      $("rLoc").textContent = d.city + ", " + d.zone;
+      $("rLoc").textContent = d.city + (d.zone ? "  ·  " + d.zone : "");
     } else {
       $("rLocLabel").hidden = true; $("rLoc").hidden = true;
     }

@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>11 AM Board — SNT Field Board</title>
+<meta name="theme-color" content="#EEF1EC">
+<title>Live Board — SNT Field Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -11,15 +12,26 @@
 </head>
 <body>
 
-<div class="mast">
-  <h1>SNT <span>/ 11 AM Board</span></h1>
-  <div class="date" id="mastDate"></div>
-</div>
+<header class="mast">
+  <div class="brand">
+    <div class="logo">SNT</div>
+    <div class="tt">
+      <span class="co">Shree Narayani Traders</span>
+      <h1>Field Board <span>· who's where</span></h1>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
+    <div class="date" id="mastDate"></div>
+    <a class="pill" href="index.html">＋&nbsp; Mark my day</a>
+  </div>
+</header>
 
 <div class="tally">
-  <strong class="big" id="cnt">–</strong>
-  <span class="of" id="of">of – marked</span>
-  <span class="bar"><i id="bar" style="width:0%"></i></span>
+  <div class="figure">
+    <strong class="big" id="cnt">–</strong>
+    <span class="of" id="of">of – marked</span>
+  </div>
+  <div class="meter"><span class="bar"><i id="bar" style="width:0%"></i></span></div>
   <button class="refresh" id="refreshBtn">Refresh</button>
 </div>
 
@@ -36,11 +48,6 @@
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
     );
   }
-  function isLate(t) {
-    const h = parseInt(String(t || "").split(":")[0], 10);
-    return Number.isFinite(h) && h >= CUTOFF_HOUR;
-  }
-  const lateTag = (t) => (isLate(t) ? '<span class="tag-late">LATE</span>' : "");
   const nameCell = (n, d) =>
     `<span class="nm">${esc(n)}<span class="dv">${esc(d)}</span></span>`;
 
@@ -61,8 +68,22 @@
     MRS.forEach((m) => {
       const r = marked[m.id];
       if (!r) { unmarked.push(m); return; }
-      if (r.status === "WORKING" && buckets[r.zone]) buckets[r.zone].push(r);
-      else offField.push(r);
+      if (r.status === "WORKING") {
+        // An MR can log towns across several zones in one entry.
+        // Group their towns by the zone each town belongs to.
+        const towns = splitList(r.city);
+        const declared = splitList(r.zone);
+        const byZone = {};
+        towns.forEach((t) => {
+          const z = CITY_TO_ZONE[t] || declared[0];
+          if (z && buckets[z]) (byZone[z] = byZone[z] || []).push(t);
+        });
+        Object.keys(byZone).forEach((z) => {
+          buckets[z].push({ mrName: r.mrName, division: r.division, towns: byZone[z] });
+        });
+      } else {
+        offField.push(r);
+      }
     });
 
     const total = MRS.length, done = total - unmarked.length;
@@ -70,38 +91,38 @@
     $("of").textContent = "of " + total + " marked";
     $("bar").style.width = (total ? (done / total) * 100 : 0) + "%";
 
-    let html = "";
-
-    // --- the map: 2x2 ---
+    // --- the zones ---
+    let zonesHTML = "";
     BOARD_ORDER.forEach((z) => {
       const list = buckets[z];
       const inner = list.length
-        ? "<ul>" + list.map((r) =>
-            `<li>${nameCell(r.mrName, r.division)}<span class="loc">${esc(r.city)}${lateTag(r.time)}</span></li>`
+        ? "<ul>" + list.map((e) =>
+            `<li>${nameCell(e.mrName, e.division)}<span class="loc">${esc(e.towns.join(", "))}</span></li>`
           ).join("") + "</ul>"
         : '<p class="empty">Nobody in this zone today.</p>';
-      html += boxHTML("zone", ` style="--zc:var(${ZONE_KEY[z].var})"`, z, list.length, inner);
+      zonesHTML += boxHTML("zone", ` style="--zc:var(${ZONE_KEY[z].var})"`, z, list.length, inner);
     });
-
-    html += '<div class="rule"></div>';
 
     // --- summary row ---
     const LBL = { HQ: "Travelling to HQ", OFFICE: "SNT Office", LEAVE: "On leave" };
-    html += boxHTML("offfield", "", "Not in field — declared", offField.length,
+    const offHTML = boxHTML("offfield", "", "Not in field — declared", offField.length,
       offField.length
         ? "<ul>" + offField.map((r) =>
-            `<li>${nameCell(r.mrName, r.division)}<span class="loc">${esc(LBL[r.status] || r.status)}${lateTag(r.time)}</span></li>`
+            `<li>${nameCell(r.mrName, r.division)}<span class="loc">${esc(LBL[r.status] || r.status)}</span></li>`
           ).join("") + "</ul>"
         : '<p class="empty">Everyone is in the field.</p>'
     );
 
-    html += boxHTML("unmarked" + (unmarked.length ? "" : " clear"), "", "Not marked — call these", unmarked.length,
+    const unmarkedHTML = boxHTML("unmarked" + (unmarked.length ? "" : " clear"), "", "Not marked — call these", unmarked.length,
       unmarked.length
         ? "<ul>" + unmarked.map((m) => `<li>${nameCell(m.name, m.division)}</li>`).join("") + "</ul>"
         : `<p class="empty">All ${total} marked. Nothing to chase.</p>`
     );
 
-    $("board").innerHTML = html;
+    $("board").innerHTML =
+      '<div class="zones-grid">' + zonesHTML + '</div>' +
+      '<div class="divider">Summary</div>' +
+      '<div class="summary-grid">' + offHTML + unmarkedHTML + '</div>';
   }
 
   async function load() {
@@ -118,8 +139,9 @@
     } catch (e) {
       b.textContent = "Retry";
       $("board").innerHTML =
-        '<section class="box unmarked" style="grid-column:1/-1"><header><h2>Board did not load</h2></header>' +
-        '<p class="empty">' + esc(e.message) + ' — press Retry.</p></section>';
+        '<div class="zones-grid"><section class="box unmarked" style="grid-column:1/-1">' +
+        '<header><h2>Board did not load</h2></header>' +
+        '<p class="empty">' + esc(e.message) + (e.apiConfig ? '.' : ' — press Retry.') + '</p></section></div>';
     }
   }
 
