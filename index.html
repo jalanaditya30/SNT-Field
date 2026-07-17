@@ -177,13 +177,11 @@
     try {
       // text/plain keeps this a "simple request" — no CORS preflight,
       // which Apps Script web apps cannot answer.
-      const res = await fetch(API_URL, {
+      const out = await apiFetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
-        redirect: "follow",
       });
-      const out = await res.json();
       if (!out.ok) throw new Error(out.error || "Server rejected the entry");
 
       localStorage.setItem(KEY_DONE, JSON.stringify({ ...payload, time: out.time }));
@@ -192,7 +190,9 @@
       btn.disabled = false;
       btn.textContent = "Mark my day";
       msg.className = "msg err";
-      msg.textContent = "Could not send — check your connection and press again. (" + err.message + ")";
+      msg.textContent = err.apiConfig
+        ? err.message + "."
+        : "Could not send — check your connection and press again. (" + err.message + ")";
     }
   });
 

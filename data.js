@@ -76,11 +76,32 @@ function prettyDateIST() {
   }).format(new Date());
 }
 
+/* Fetch JSON from the Apps Script API. When Google answers with an HTML
+   page instead of JSON (sign-in page, "page not found", authorisation
+   screen), explain the real problem instead of "Unexpected token '<'". */
+async function apiFetch(url, options) {
+  const res = await fetch(url, Object.assign({ redirect: "follow" }, options || {}));
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    const err = new Error(
+      /^\s*</.test(text)
+        ? "The Google Script link is answering with a web page, not data. " +
+          "Owner: in Apps Script go Deploy ▸ Manage deployments ▸ ✏️, set " +
+          "“Who has access” to “Anyone”, pick “New version”, Deploy — and check " +
+          "API_URL in data.js matches the current /exec URL"
+        : "Unexpected reply from the server (HTTP " + res.status + ")"
+    );
+    err.apiConfig = true;
+    throw err;
+  }
+}
+
 /* Pull the live MR list from the Master tab. Falls back silently. */
 async function loadMaster() {
   try {
-    const res = await fetch(API_URL + "?config=1&t=" + Date.now(), { redirect: "follow" });
-    const out = await res.json();
+    const out = await apiFetch(API_URL + "?config=1&t=" + Date.now());
     if (out && out.ok && Array.isArray(out.mrs) && out.mrs.length) {
       MRS = out.mrs;
       MRS_SOURCE = "sheet";
