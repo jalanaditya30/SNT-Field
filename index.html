@@ -92,18 +92,29 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-  /* ---- live MR list from the Master tab; built-in list if offline ---- */
+  /* ---- MR list: show cached / built-in names instantly, then refresh
+          from the Master tab in the background (no blank wait) ---- */
   const mrSel = $("mr");
-  mrSel.innerHTML = '<option value="">Loading names…</option>';
-  mrSel.disabled = true;
-  await loadMaster();
-  mrSel.disabled = false;
-  mrSel.innerHTML = '<option value="">Select your name…</option>';
-  MRS.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((m) => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    o.textContent = m.name + " · " + m.division;
-    mrSel.appendChild(o);
+  function populateNames() {
+    const keep = mrSel.value;
+    mrSel.innerHTML = '<option value="">Select your name…</option>';
+    MRS.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((m) => {
+      const o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = m.name + " · " + m.division;
+      mrSel.appendChild(o);
+    });
+    if (keep) mrSel.value = keep;
+  }
+  primeMastersFromCache();
+  populateNames();
+  loadMaster().then(() => {
+    populateNames();
+    const me = localStorage.getItem(KEY_ME);
+    if (me && !mrSel.value && MRS.some((m) => m.id === me)) {
+      mrSel.value = me;
+      mrSel.dispatchEvent(new Event("change"));
+    }
   });
 
   /* ---- status buttons ---- */

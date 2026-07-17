@@ -20,10 +20,7 @@
       <h1>Field Board <span>· who's where</span></h1>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
-    <div class="date" id="mastDate"></div>
-    <a class="pill" href="index.html">＋&nbsp; Mark my day</a>
-  </div>
+  <a class="pill" href="index.html">＋&nbsp; Mark my day</a>
 </header>
 
 <div class="tally">
@@ -31,8 +28,9 @@
     <strong class="big" id="cnt">–</strong>
     <span class="of" id="of">of – marked</span>
   </div>
-  <div class="meter"><span class="bar"><i id="bar" style="width:0%"></i></span></div>
+  <div class="board-date" id="boardDate"></div>
   <button class="refresh" id="refreshBtn">Refresh</button>
+  <div class="meter"><span class="bar"><i id="bar" style="width:0%"></i></span></div>
 </div>
 
 <main class="board" id="board"></main>
@@ -41,7 +39,8 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  $("mastDate").textContent = prettyDateIST();
+  const BOARD_CACHE = "snt_board_cache";
+  $("boardDate").textContent = prettyDateIST();
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
@@ -125,27 +124,59 @@
       '<div class="summary-grid">' + offHTML + unmarkedHTML + '</div>';
   }
 
+  // Paint the last board we saw the instant the page opens, so there's
+  // never a blank wait while the network catches up.
+  function paintFromCache() {
+    try {
+      const c = JSON.parse(localStorage.getItem(BOARD_CACHE) || "null");
+      if (c && c.date === todayIST() && Array.isArray(c.rows)) {
+        if (Array.isArray(c.mrs) && c.mrs.length) { MRS = c.mrs; MRS_SOURCE = "sheet"; }
+        render(c.rows);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   async function load() {
     const b = $("refreshBtn");
-    b.textContent = "Loading…";
+    if (b.textContent !== "Retry") b.textContent = "Loading…";
     try {
-      await loadMaster();   // live MR list from the Master tab
-      const out = await apiFetch(API_URL + "?date=" + todayIST() + "&t=" + Date.now());
+      // One round-trip: MR list + today's rows together (backend ?board=1).
+      const out = await apiFetch(API_URL + "?board=1&date=" + todayIST() + "&t=" + Date.now());
       if (!out.ok) throw new Error(out.error || "load failed");
-      render(out.rows || []);
+
+      if (Array.isArray(out.mrs) && out.mrs.length) {
+        MRS = out.mrs; MRS_SOURCE = "sheet";
+        try { localStorage.setItem("snt_mrs", JSON.stringify(out.mrs)); } catch (e) {}
+      } else if (MRS_SOURCE !== "sheet") {
+        // Older backend that doesn't answer ?board=1 with a list — get it separately.
+        await loadMaster();
+      }
+
+      const rows = out.rows || [];
+      render(rows);
+      try {
+        localStorage.setItem(BOARD_CACHE, JSON.stringify({ date: todayIST(), rows: rows, mrs: MRS }));
+      } catch (e) {}
+
       b.textContent = MRS_SOURCE === "sheet" ? "Refresh" : "Refresh · old list";
       b.title = MRS_SOURCE === "sheet" ? "" :
         "Could not read the Master tab — showing the built-in MR list, which may be out of date.";
     } catch (e) {
       b.textContent = "Retry";
-      $("board").innerHTML =
-        '<div class="zones-grid"><section class="box unmarked" style="grid-column:1/-1">' +
-        '<header><h2>Board did not load</h2></header>' +
-        '<p class="empty">' + esc(e.message) + (e.apiConfig ? '.' : ' — press Retry.') + '</p></section></div>';
+      // Keep whatever is already on screen (cache); only show an error on a blank board.
+      if (!$("board").querySelector(".zones-grid")) {
+        $("board").innerHTML =
+          '<div class="zones-grid"><section class="box unmarked" style="grid-column:1/-1">' +
+          '<header><h2>Board did not load</h2></header>' +
+          '<p class="empty">' + esc(e.message) + (e.apiConfig ? '.' : ' — press Retry.') + '</p></section></div>';
+      }
     }
   }
 
   $("refreshBtn").addEventListener("click", load);
+  paintFromCache();
   load();
   setInterval(load, 60000);
 })();

@@ -270,8 +270,13 @@ select:disabled { opacity: .5; }
   font-size: 40px; line-height: 1; letter-spacing: -.02em; color: var(--brand-ink);
 }
 .tally .of { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--ink-2); }
+.tally .board-date {
+  flex: 1 1 auto; text-align: center;
+  font-family: "Archivo", sans-serif; font-weight: 700; font-stretch: 90%;
+  font-size: 15px; letter-spacing: .01em; color: var(--brand-ink);
+}
 .tally .meter {
-  flex: 1 1 200px; min-width: 140px;
+  flex: 1 1 100%; order: 9; min-width: 140px;
 }
 .tally .bar {
   height: 10px; background: var(--paper-2); border-radius: 99px; overflow: hidden;
@@ -361,5 +366,6 @@ select:disabled { opacity: .5; }
   .zones-grid, .summary-grid { grid-template-columns: 1fr; }
   .box.zone { min-height: 0; }
   .tally .big { font-size: 34px; }
+  .tally .board-date { flex-basis: 100%; order: 8; text-align: left; margin-top: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { *, html { transition: none !important; scroll-behavior: auto; } }
