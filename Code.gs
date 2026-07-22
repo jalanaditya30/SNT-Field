@@ -44,8 +44,7 @@ var MR_SEED = [
   ['mr14', 'Nilesh',     'Ranbaxy',            'Y'],
   ['mr15', 'Vinayak',    'Lupin',              'Y'],
   ['mr16', 'Haresh',     'Lupin',              'Y'],
-  ['mr17', 'Sanjay',     'Torque',             'Y'],
-  ['mr18', 'Jagdish',    'Torque',             'Y']
+  ['mr17', 'Sanjay',     'Torque',             'Y']
 ];
 
 function getSS_() {
