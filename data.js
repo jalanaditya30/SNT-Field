@@ -30,7 +30,6 @@ let MRS = [
   { id: "mr15", name: "Vinayak",     division: "Lupin" },
   { id: "mr16", name: "Haresh",      division: "Lupin" },
   { id: "mr17", name: "Sanjay",      division: "Torque" },
-  { id: "mr18", name: "Jagdish",     division: "Torque" },
 ];
 let MRS_SOURCE = "fallback";
 
