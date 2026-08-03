@@ -153,14 +153,15 @@ function doPost(e) {
     var sh   = getLog_();
     var note = String(d.note || '').slice(0, 60);
 
-    // Leave over a date range: write one LEAVE row per day, so the board
-    // shows the MR on leave every day in the range without re-marking.
-    if (d.status === 'LEAVE' && d.leaveFrom) {
+    // Date-range statuses (leave, Company HQ): write one row per day, so the
+    // board shows the MR out of the field every day in the range without
+    // re-marking. Working any of those days simply overwrites that day's row.
+    if ((d.status === 'LEAVE' || d.status === 'HQ') && d.leaveFrom) {
       var days = datesBetween_(d.leaveFrom, d.leaveTo || d.leaveFrom);
-      if (!days.length) return json_({ ok: false, error: 'Pick valid leave dates' });
+      if (!days.length) return json_({ ok: false, error: 'Pick valid dates' });
       for (var k = 0; k < days.length; k++) {
         upsertRow_(sh, d.mrId, days[k],
-          [now, days[k], time, String(d.mrId), d.mrName || '', d.division || '', 'LEAVE', '', '', note]);
+          [now, days[k], time, String(d.mrId), d.mrName || '', d.division || '', d.status, '', '', note]);
         cacheDel_('c_full_' + days[k]);
         cacheDel_('c_rows_' + days[k]);
       }

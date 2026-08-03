@@ -97,11 +97,13 @@ function splitList(s) {
     .filter(Boolean);
 }
 
-/* 5. Non-field statuses. WORKING is handled separately. */
+/* 5. Non-field statuses. WORKING is handled separately.
+      range: true statuses take a From/To calendar and write one row per day. */
 const STATUSES = [
   { code: "WORKING", label: "Working in field", field: true },
   { code: "OFFICE",  label: "SNT Office",       field: false },
-  { code: "LEAVE",   label: "On leave",         field: false },
+  { code: "HQ",      label: "Company HQ",        field: false, range: true },
+  { code: "LEAVE",   label: "On leave",         field: false, range: true },
 ];
 
 /* ---- shared helpers ---- */
