@@ -40,7 +40,7 @@ let MRS_SOURCE = "fallback";
       records the zone the town was picked under — see index.html. */
 const ZONES = {
   "Ahmedabad": [
-    "Maninagar", "Narol-Naroda", "Paldi - Ratnamani", "Chandkhera - Gota", "Gandhinagar",
+    "Maninagar", "Narol-Naroda", "Paldi - Ratnamani", "Chandkhera - Gota", "Gandhinagar", "Sarkhej",
   ],
   "North Gujarat": [
     "Bechraji", "Chanasma", "Chhatral", "Deesa", "Dehgam", "Deodar", "Dhanera",
