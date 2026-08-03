@@ -54,7 +54,7 @@
     </div>
 
     <div class="step" id="stepLeave" hidden>
-      <span class="eyebrow">Leave dates <span class="req">— mark the whole period once</span></span>
+      <span class="eyebrow" id="datesTitle">Leave dates <span class="req">— mark the whole period once</span></span>
       <div class="daterow">
         <div><label class="eyebrow2" for="leaveFrom">From</label><input type="date" id="leaveFrom"></div>
         <div><label class="eyebrow2" for="leaveTo">To</label><input type="date" id="leaveTo"></div>
@@ -235,15 +235,16 @@
   }
   function updateLeaveHint() {
     const f = lFrom.value, t = lTo.value;
+    const lead = state.status === "HQ" ? "At Company HQ" : "On leave";
     if (f && t && f <= t) {
       const n = daysInclusive(f, t);
       lHint.textContent = n === 1
-        ? "On leave " + fmtDay(f) + " — 1 day."
-        : "On leave " + formatRange(f, t) + ". Marked once for the whole period — no need to mark again.";
+        ? lead + " " + fmtDay(f) + " — 1 day."
+        : lead + " " + formatRange(f, t) + ". Marked once for the whole period — no need to mark again.";
     } else if (f && t && f > t) {
       lHint.textContent = "The “To” date is before the “From” date.";
     } else {
-      lHint.textContent = "Pick your leave dates.";
+      lHint.textContent = "Pick your dates.";
     }
   }
   lFrom.addEventListener("change", () => {
@@ -265,10 +266,11 @@
     [...sBox.children].forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.code === code))
     );
-    const needsPlace = STATUSES.find((s) => s.code === code).field;
-    const isLeave = code === "LEAVE";
+    const st = STATUSES.find((s) => s.code === code);
+    const needsPlace = st.field;
+    const needsDates = !!st.range;
     $("stepWhere").hidden = !needsPlace;
-    $("stepLeave").hidden = !isLeave;
+    $("stepLeave").hidden = !needsDates;
     if (needsPlace) {
       if (!$("townWrap").children.length) renderTowns();
     } else {
@@ -276,15 +278,19 @@
       [...zBox.children].forEach((b) => b.setAttribute("aria-pressed", "false"));
       renderTowns();
     }
-    if (isLeave) updateLeaveHint();
+    if (needsDates) {
+      const word = code === "LEAVE" ? "Leave" : st.label;
+      $("datesTitle").innerHTML = esc(word) + ' dates <span class="req">— mark the whole period once</span>';
+      updateLeaveHint();
+    }
     refresh();
   }
 
   function valid() {
     if (!state.mrId || !state.status) return false;
-    const needsPlace = STATUSES.find((s) => s.code === state.status).field;
-    if (needsPlace) return state.picks.length > 0;
-    if (state.status === "LEAVE") return !!(lFrom.value && lTo.value && lFrom.value <= lTo.value);
+    const st = STATUSES.find((s) => s.code === state.status);
+    if (st.field) return state.picks.length > 0;
+    if (st.range) return !!(lFrom.value && lTo.value && lFrom.value <= lTo.value);
     return true;
   }
   function refresh() {
@@ -319,7 +325,9 @@
       city: ordered.map((p) => p.city).join(", "),
       note: state.status === "WORKING" ? $("note").value.trim() : "",
     };
-    if (state.status === "LEAVE") { payload.leaveFrom = lFrom.value; payload.leaveTo = lTo.value; }
+    if (STATUSES.find((s) => s.code === state.status).range) {
+      payload.leaveFrom = lFrom.value; payload.leaveTo = lTo.value;
+    }
 
     try {
       // text/plain keeps this a "simple request" — no CORS preflight,
@@ -346,11 +354,12 @@
   /* ---- receipt ---- */
   function showReceipt(d, updated) {
     const st = STATUSES.find((s) => s.code === d.status);
-    const isLeave = d.status === "LEAVE" && d.leaveFrom;
-    $("receiptTitle").textContent = isLeave ? "Leave marked" : (updated ? "Entry updated" : "Marked for today");
+    const isRange = !!(st && st.range && d.leaveFrom);
+    const rangeTitle = d.status === "LEAVE" ? "Leave marked" : (st ? st.label + " marked" : "Marked");
+    $("receiptTitle").textContent = isRange ? rangeTitle : (updated ? "Entry updated" : "Marked for today");
     $("rName").textContent = d.mrName + " · " + d.division;
     $("rStatus").textContent = st ? st.label : d.status;
-    if (isLeave) {
+    if (isRange) {
       $("rLocLabel").hidden = false; $("rLoc").hidden = false;
       $("rLocLabel").textContent = "Dates";
       $("rLoc").textContent = formatRange(d.leaveFrom, d.leaveTo);
